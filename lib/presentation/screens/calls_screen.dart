@@ -7,174 +7,112 @@ class CallsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Заглушка с данными звонков
+    // Данные звонков для периодов 1-7
     final List<Map<String, String>> callsData = [
-      {'time': '1', 'description': '08:30 - Начало занятий'},
-      {'time': '2', 'description': '09:15 - Первый звонок'},
-      {'time': '3', 'description': '09:25 - Начало второго занятия'},
-      {'time': '4', 'description': '10:10 - Второй звонок'},
-      {'time': '5', 'description': '10:30 - Начало третьего занятия'},
-      {'time': '6', 'description': '11:15 - Третий звонок'},
-      {'time': '7', 'description': '11:25 - Начало четвертого занятия'},
-      {'time': '8', 'description': '12:10 - Четвертый звонок'},
-      {'time': '9', 'description': '12:30 - Начало пятого занятия'},
-      {'time': '10', 'description': '13:15 - Окончание занятий'},
+      {'period': '1', 'time': '08:30', 'description': 'Начало занятий'},
+      {'period': '2', 'time': '09:15', 'description': 'Первый звонок'},
+      {'period': '3', 'time': '09:25', 'description': 'Начало второго занятия'},
+      {'period': '4', 'time': '10:10', 'description': 'Второй звонок'},
+      {'period': '5', 'time': '10:30', 'description': 'Начало третьего занятия'},
+      {'period': '6', 'time': '11:15', 'description': 'Третий звонок'},
+      {'period': '7', 'time': '11:25', 'description': 'Начало четвертого занятия'},
     ];
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Звонки',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Будние дни',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF81C784),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  width: 45,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFF333333),
-                      width: 1,
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Header
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Звонки',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                  child: const Icon(
-                    Icons.notifications,
-                    size: 28,
-                    color: Color(0xFF81C784),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // Single container for all calls
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF333333),
+                    width: 1,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            
-            // Info card
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF121212),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color(0xFF333333),
-                  width: 1,
-                ),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info,
-                      color: Color(0xFF81C784),
-                      size: 24,
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Звонки происходят за 5 минут до начала/окончания занятия',
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Calls list
-            const Text(
-              'Расписание звонков',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Column(
-              children: List.generate(
-                callsData.length,
-                (index) {
-                  final data = callsData[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF121212),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFF333333),
-                          width: 1,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            // Номер звонка
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF81C784),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  data['time']!,
+                child: Column(
+                  children: List.generate(
+                    callsData.length,
+                    (index) {
+                      final data = callsData[index];
+                      return Column(
+                        children: [
+                          if (index > 0) const Divider(
+                            color: Color(0xFF333333),
+                            height: 1,
+                            thickness: 1,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                // Номер периода (обычный текст, белый цвет)
+                                Text(
+                                  data['period']!,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                                    fontSize: 18,
                                   ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Описание звонка
-                            Expanded(
-                              child: Text(
-                                data['description']!,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
+                                const SizedBox(width: 16),
+                                // Время и описание
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        data['time']!,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        data['description']!,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

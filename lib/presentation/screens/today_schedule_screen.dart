@@ -155,7 +155,7 @@ class _ScheduleItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF121212),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const Color(0xFF333333),

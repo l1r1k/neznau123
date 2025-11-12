@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:my_mpt/core/constants/app_constants.dart';
 import 'package:my_mpt/presentation/screens/today_schedule_screen.dart';
 import 'package:my_mpt/presentation/screens/schedule_screen.dart';
+import 'package:my_mpt/presentation/screens/calls_screen.dart';
 import 'package:my_mpt/presentation/screens/settings_screen.dart';
 
 void main() {
@@ -24,31 +25,34 @@ class MyApp extends StatelessWidget {
           secondary: Color(0xFF81C784),
           tertiary: Color(0xFFF7943C),
           surface: Color(0xFF121212),
-          background: Color(0xFF0A0A0A),
+          background: Color(0xFF1C1C1C),
           onPrimary: Colors.white,
           onSecondary: Colors.white,
           onTertiary: Colors.white,
           onSurface: Colors.white,
           onBackground: Colors.white,
         ),
-        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
+        scaffoldBackgroundColor: const Color(0xFF1C1C1C),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF121212),
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFF121212),
-          selectedItemColor: Color(0xFF64B5F6),
-          unselectedItemColor: Colors.grey,
-        ),
         navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: const Color(0xFF121212),
+          backgroundColor: const Color(0xFF1E1E1E),
           indicatorColor: Colors.transparent,
-          labelTextStyle: WidgetStateProperty.all(const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          )),
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const IconThemeData(
+                color: Colors.white,
+                size: 28,
+              );
+            }
+            return const IconThemeData(
+              color: Colors.grey,
+              size: 28,
+              );
+          }),
         ),
       ),
       home: const MainScreen(),
@@ -70,6 +74,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const TodayScheduleScreen(),
     const ScheduleScreen(),
+    const CallsScreen(),
     const SettingsScreen(),
   ];
 
@@ -79,91 +84,42 @@ class _MainScreenState extends State<MainScreen> {
       // Apply SafeArea only to specific screens
       body: _currentIndex == 0 || _currentIndex == 1 
         ? _screens[_currentIndex] // Schedule screens without SafeArea
-        : SafeArea(child: _screens[_currentIndex]), // Other screens with SafeArea
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF121212),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+        : SafeArea(child: _screens[_currentIndex]),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        backgroundColor: const Color(0xFF1E1E1E),
+        indicatorColor: Colors.transparent,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+        elevation: 10,
+        height: 60,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined, size: 28),
+            selectedIcon: Icon(Icons.home, size: 28),
+            label: '',
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 15,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_today_outlined, size: 28),
+            selectedIcon: Icon(Icons.calendar_today, size: 28),
+            label: '',
           ),
-          child: NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            backgroundColor: Colors.transparent,
-            indicatorColor: Colors.transparent,
-            destinations: [
-              _CustomNavigationDestination(
-                icon: Icons.dashboard_outlined,
-                selectedIcon: Icons.dashboard,
-                label: 'Обзор',
-                isSelected: _currentIndex == 0,
-              ),
-              _CustomNavigationDestination(
-                icon: Icons.calendar_today_outlined,
-                selectedIcon: Icons.calendar_today,
-                label: 'Расписание',
-                isSelected: _currentIndex == 1,
-              ),
-              _CustomNavigationDestination(
-                icon: Icons.settings_outlined,
-                selectedIcon: Icons.settings,
-                label: 'Настройки',
-                isSelected: _currentIndex == 2,
-              ),
-            ],
+          NavigationDestination(
+            icon: Icon(Icons.notifications_outlined, size: 28),
+            selectedIcon: Icon(Icons.notifications, size: 28),
+            label: '',
           ),
-        ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined, size: 28),
+            selectedIcon: Icon(Icons.settings, size: 28),
+            label: '',
+          ),
+        ],
       ),
-    );
-  }
-}
-
-class _CustomNavigationDestination extends StatelessWidget {
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final bool isSelected;
-
-  const _CustomNavigationDestination({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.isSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return NavigationDestination(
-      icon: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF64B5F6).withOpacity(0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Icon(
-          isSelected ? selectedIcon : icon,
-          color: isSelected ? const Color(0xFF64B5F6) : Colors.grey,
-        ),
-      ),
-      label: label,
     );
   }
 }
