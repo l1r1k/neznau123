@@ -93,7 +93,7 @@ class ScheduleScreen extends StatelessWidget {
       Schedule(
         id: '9',
         number: '1',
-        subject: 'Математика',
+        subject: 'Обеспечение качества функционирования КС',
         teacher: 'Иванова И.И.',
         startTime: '08:30',
         endTime: '09:15',
@@ -102,8 +102,8 @@ class ScheduleScreen extends StatelessWidget {
       Schedule(
         id: '10',
         number: '2',
-        subject: 'Физика',
-        teacher: 'Петров П.П.',
+        subject: 'Иностранный язык в профессиональной деятельности',
+        teacher: 'Завьялова П.П., Завьялова П.П.',
         startTime: '09:25',
         endTime: '10:10',
         building: 'Нахимовский',
