@@ -36,4 +36,18 @@ class ScheduleRepository implements ScheduleRepositoryInterface {
       return [];
     }
   }
+
+  /// Получить расписание на завтра
+  Future<List<Schedule>> getTomorrowSchedule() async {
+    try {
+      final response = await _apiService.getScheduleData();
+      // Для демонстрации возвращаем те же данные, что и для сегодня
+      // В реальной реализации здесь должна быть логика получения расписания на завтра
+      return response.todaySchedule;
+    } catch (e) {
+      // В реальном приложении мы бы обработали ошибки соответствующим образом
+      debugPrint('Ошибка при получении расписания на завтра: $e');
+      return [];
+    }
+  }
 }

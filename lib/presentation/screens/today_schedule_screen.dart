@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:my_mpt/core/utils/date_formatter.dart';
 import 'package:my_mpt/domain/entities/schedule.dart';
 import 'package:my_mpt/domain/usecases/get_today_schedule_usecase.dart';
+import 'package:my_mpt/domain/usecases/get_tomorrow_schedule_usecase.dart';
 import 'package:my_mpt/domain/repositories/schedule_repository_interface.dart';
 import 'package:my_mpt/data/repositories/schedule_repository.dart';
 import 'package:my_mpt/presentation/widgets/building_chip.dart';
@@ -26,26 +27,33 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
 
   late ScheduleRepositoryInterface _repository;
   late GetTodayScheduleUseCase _getTodayScheduleUseCase;
-  List<Schedule> _scheduleData = [];
+  late GetTomorrowScheduleUseCase _getTomorrowScheduleUseCase;
+  List<Schedule> _todayScheduleData = [];
+  List<Schedule> _tomorrowScheduleData = [];
   bool _isLoading = true;
+  final PageController _pageController = PageController();
+  int _currentPageIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _repository = ScheduleRepository();
     _getTodayScheduleUseCase = GetTodayScheduleUseCase(_repository);
-    _loadTodaySchedule();
+    _getTomorrowScheduleUseCase = GetTomorrowScheduleUseCase(_repository);
+    _loadScheduleData();
   }
 
-  Future<void> _loadTodaySchedule() async {
+  Future<void> _loadScheduleData() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final schedule = await _getTodayScheduleUseCase();
+      final todaySchedule = await _getTodayScheduleUseCase();
+      final tomorrowSchedule = await _getTomorrowScheduleUseCase();
       setState(() {
-        _scheduleData = schedule;
+        _todayScheduleData = todaySchedule;
+        _tomorrowScheduleData = tomorrowSchedule;
         _isLoading = false;
       });
     } catch (e) {
@@ -60,104 +68,131 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final building = _primaryBuilding(_scheduleData);
-    final dateLabel = _formatDate(DateTime.now());
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF8C00)))
             : RefreshIndicator(
-                onRefresh: _loadTodaySchedule,
-                child: CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: _TodayHeader(
-                        dateLabel: dateLabel,
-                        lessonsCount: _scheduleData.length,
-                        gradient: _headerGradient,
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      sliver: SliverToBoxAdapter(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Row(
-                                children: [
-                                  const Expanded(
-                                    child: Text(
-                                      'Сегодня',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (building.isNotEmpty) ...[
-                                    const SizedBox(width: 10),
-                                    Flexible(
-                                      child: Align(
-                                        alignment: Alignment.centerRight,
-                                        child: BuildingChip(label: building),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Column(
-                              children: List.generate(_scheduleData.length, (index) {
-                                final item = _scheduleData[index];
-                                final widgets = <Widget>[
-                                  LessonCard(
-                                    number: item.number,
-                                    subject: item.subject,
-                                    teacher: item.teacher,
-                                    startTime: item.startTime,
-                                    endTime: item.endTime,
-                                    accentColor: _lessonAccent,
-                                  ),
-                                ];
-
-                                // Add break indicator after each lesson except the last one
-                                if (index < _scheduleData.length - 1) {
-                                  final nextItem = _scheduleData[index + 1];
-                                  widgets.add(
-                                    BreakIndicator(
-                                      duration: '20 минут', // This could be calculated based on actual times
-                                      startTime: item.endTime,
-                                      endTime: nextItem.startTime,
-                                    ),
-                                  );
-                                }
-
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom: index == _scheduleData.length - 1 ? 0 : 14,
-                                  ),
-                                  child: Column(
-                                    children: widgets,
-                                  ),
-                                );
-                              }),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                onRefresh: _loadScheduleData,
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPageIndex = index;
+                    });
+                  },
+                  children: [
+                    // Today page
+                    _buildSchedulePage(_todayScheduleData, 'Сегодня'),
+                    // Tomorrow page
+                    _buildSchedulePage(_tomorrowScheduleData, 'Завтра'),
                   ],
                 ),
               ),
       ),
+    );
+  }
+
+  Widget _buildSchedulePage(List<Schedule> scheduleData, String pageTitle) {
+    final building = _primaryBuilding(scheduleData);
+    final dateLabel = _formatDate(pageTitle == 'Сегодня' ? DateTime.now() : DateTime.now().add(const Duration(days: 1)));
+
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: _TodayHeader(
+            dateLabel: dateLabel,
+            lessonsCount: scheduleData.length,
+            gradient: _headerGradient,
+            pageTitle: pageTitle,
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          pageTitle,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (building.isNotEmpty) ...[
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: BuildingChip(label: building),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: List.generate(scheduleData.length, (index) {
+                      final item = scheduleData[index];
+                      final widgets = <Widget>[
+                        LessonCard(
+                          number: item.number,
+                          subject: item.subject,
+                          teacher: item.teacher,
+                          startTime: item.startTime,
+                          endTime: item.endTime,
+                          accentColor: _lessonAccent,
+                        ),
+                      ];
+
+                      // Add break indicator after each lesson except the last one
+                      if (index < scheduleData.length - 1) {
+                        final nextItem = scheduleData[index + 1];
+                        widgets.add(
+                          BreakIndicator(
+                            duration: '20 минут', // This could be calculated based on actual times
+                            startTime: item.endTime,
+                            endTime: nextItem.startTime,
+                          ),
+                        );
+                      }
+
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          bottom: index == scheduleData.length - 1 ? 0 : 14,
+                        ),
+                        child: Column(
+                          children: widgets,
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -189,11 +224,13 @@ class _TodayHeader extends StatelessWidget {
   final String dateLabel;
   final int lessonsCount;
   final List<Color> gradient;
+  final String pageTitle;
 
   const _TodayHeader({
     required this.dateLabel,
     required this.lessonsCount,
     required this.gradient,
+    required this.pageTitle,
   });
 
   @override
@@ -207,7 +244,6 @@ class _TodayHeader extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.45),
@@ -239,9 +275,9 @@ class _TodayHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
-              'Сегодня',
-              style: TextStyle(
+            Text(
+              pageTitle,
+              style: const TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -284,6 +320,7 @@ class _MetricChip extends StatelessWidget {
             style: const TextStyle(fontSize: 13, color: Colors.white),
           ),
         ],
-      );
+      ),
+    );
   }
 }

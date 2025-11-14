@@ -7,4 +7,7 @@ abstract class ScheduleRepositoryInterface {
 
   /// Получить расписание на сегодня
   Future<List<Schedule>> getTodaySchedule();
+
+  /// Получить расписание на завтра
+  Future<List<Schedule>> getTomorrowSchedule();
 }
