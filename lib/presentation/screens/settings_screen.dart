@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  static const _backgroundColor = Color(0xFF05070C);
+  static const _backgroundColor = Color(0xFF000000);
+  static const List<Color> _headerGradient = [
+    Color(0xFF333333),
+    Color(0xFF111111),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -45,12 +49,11 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 14),
               Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0E1324),
+                  color: const Color(0xFF111111),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
                 child: const ListTile(
-                  leading: Icon(Icons.info_outline, color: Colors.white),
+                  leading: Icon(Icons.info_outline, color: Color(0xFFFF8C00)),
                   title: Text(
                     'О приложении',
                     style: TextStyle(
@@ -79,15 +82,15 @@ class _SettingsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 0),
       padding: const EdgeInsets.fromLTRB(24, 30, 24, 26),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
         gradient: const LinearGradient(
-          colors: [Color(0xFF2C1E4A), Color(0xFF1F1233)],
+          colors: SettingsScreen._headerGradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,9 +149,8 @@ class _SettingsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
-        color: const Color(0xFF0E1324),
+        color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Row(
         children: [
@@ -156,10 +158,10 @@ class _SettingsCard extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
+              color: const Color(0xFFFF8C00).withOpacity(0.1),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(icon, color: Colors.white),
+            child: Icon(icon, color: const Color(0xFFFF8C00)),
           ),
           const SizedBox(width: 16),
           Expanded(

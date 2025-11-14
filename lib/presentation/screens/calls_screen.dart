@@ -3,20 +3,20 @@ import 'package:flutter/material.dart';
 class CallsScreen extends StatelessWidget {
   const CallsScreen({super.key});
 
-  static const _backgroundColor = Color(0xFF05070C);
+  static const _backgroundColor = Color(0xFF000000);
+  static const List<Color> _headerGradient = [
+    Color(0xFF333333),
+    Color(0xFF111111),
+  ];
 
   static final List<Map<String, String>> _callsData = [
-    {'period': '1', 'time': '08:30', 'description': 'Начало занятий'},
-    {'period': '2', 'time': '09:15', 'description': 'Первый звонок'},
-    {'period': '3', 'time': '09:25', 'description': 'Начало второго занятия'},
-    {'period': '4', 'time': '10:10', 'description': 'Второй звонок'},
-    {'period': '5', 'time': '10:30', 'description': 'Начало третьего занятия'},
-    {'period': '6', 'time': '11:15', 'description': 'Третий звонок'},
-    {
-      'period': '7',
-      'time': '11:25',
-      'description': 'Начало четвертого занятия',
-    },
+    {'period': '1', 'time': '08:30 - 10:00', 'description': 'Перемена 10 минут'},
+    {'period': '2', 'time': '10:10 - 11:40', 'description': 'Перемена 20 минут'},
+    {'period': '3', 'time': '12:00 - 13:30', 'description': 'Перемена 20 минут'},
+    {'period': '4', 'time': '13:50 - 15:20', 'description': 'Перемена 10 минут'},
+    {'period': '5', 'time': '15:30 - 17:00', 'description': 'Перемена 5 минут'},
+    {'period': '6', 'time': '17:05 - 18:35', 'description': 'Перемена 5 минут'},
+    {'period': '7', 'time': '18:40 - 20:10', 'description': 'Конец учебного дня'},
   ];
 
   @override
@@ -37,9 +37,8 @@ class CallsScreen extends StatelessWidget {
                   vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0E1324),
+                  color: const Color(0xFF111111),
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.45),
@@ -79,11 +78,10 @@ class _CallsHeader extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1D1F3D)],
+          colors: CallsScreen._headerGradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
@@ -91,7 +89,7 @@ class _CallsHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Звонки колледжа',
+              'Звонки техникума',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
@@ -99,7 +97,7 @@ class _CallsHeader extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Актуальное расписание звонков на учебный день',
+              'Расписание звонков на учебный день',
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
@@ -136,7 +134,7 @@ class _CallTimelineTile extends StatelessWidget {
               height: 28,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  colors: [Color(0xFFFF8C00), Color(0xFFFFA500)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -157,7 +155,7 @@ class _CallTimelineTile extends StatelessWidget {
                 width: 2,
                 height: 48,
                 margin: const EdgeInsets.symmetric(vertical: 4),
-                color: Colors.white.withOpacity(0.08),
+                color: const Color(0xFFFF8C00).withOpacity(0.3),
               ),
           ],
         ),

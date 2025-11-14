@@ -7,13 +7,11 @@ import 'package:my_mpt/presentation/widgets/lesson_card.dart';
 class TodayScheduleScreen extends StatelessWidget {
   const TodayScheduleScreen({super.key});
 
-  static const _backgroundColor = Color(0xFF05070C);
-  static const _accentPalette = [
-    Color(0xFF7C3AED),
-    Color(0xFF0EA5E9),
-    Color(0xFF10B981),
-    Color(0xFFF97316),
-    Color(0xFFE11D48),
+  static const _backgroundColor = Color(0xFF000000);
+  static const Color _lessonAccent = Color(0xFFFF8C00);
+  static const List<Color> _headerGradient = [
+    Color(0xFF333333),
+    Color(0xFF111111),
   ];
 
   static final List<Schedule> _scheduleData = [
@@ -78,6 +76,7 @@ class TodayScheduleScreen extends StatelessWidget {
               child: _TodayHeader(
                 dateLabel: dateLabel,
                 lessonsCount: _scheduleData.length,
+                gradient: _headerGradient,
               ),
             ),
             SliverPadding(
@@ -101,11 +100,16 @@ class TodayScheduleScreen extends StatelessWidget {
                         ),
                         if (building.isNotEmpty) ...[
                           const SizedBox(width: 10),
-                          Flexible(child: BuildingChip(label: building)),
+                          Flexible(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: BuildingChip(label: building),
+                            ),
+                          ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                     ...List.generate(_scheduleData.length, (index) {
                       final item = _scheduleData[index];
                       return Padding(
@@ -118,8 +122,7 @@ class TodayScheduleScreen extends StatelessWidget {
                           teacher: item.teacher,
                           startTime: item.startTime,
                           endTime: item.endTime,
-                          accentColor:
-                              _accentPalette[index % _accentPalette.length],
+                          accentColor: _lessonAccent,
                         ),
                       );
                     }),
@@ -186,17 +189,22 @@ class TodayScheduleScreen extends StatelessWidget {
 class _TodayHeader extends StatelessWidget {
   final String dateLabel;
   final int lessonsCount;
+  final List<Color> gradient;
 
-  const _TodayHeader({required this.dateLabel, required this.lessonsCount});
+  const _TodayHeader({
+    required this.dateLabel,
+    required this.lessonsCount,
+    required this.gradient,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(top: 16),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF312E81), Color(0xFF1E1B4B)],
+        gradient: LinearGradient(
+          colors: gradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

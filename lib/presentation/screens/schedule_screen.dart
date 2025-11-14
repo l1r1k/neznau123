@@ -7,8 +7,8 @@ import 'package:my_mpt/presentation/widgets/lesson_card.dart';
 class ScheduleScreen extends StatelessWidget {
   const ScheduleScreen({super.key});
 
-  static const _backgroundColor = Color(0xFF05070C);
-  static const _borderColor = Color(0xFF1C2233);
+  static const _backgroundColor = Color(0xFF000000);
+  static const _borderColor = Color(0xFF333333);
 
   static final Map<String, List<Schedule>> _weeklySchedule = {
     'Понедельник': [
@@ -158,13 +158,7 @@ class ScheduleScreen extends StatelessWidget {
     ],
   };
 
-  static const _accentPalette = [
-    Color(0xFF7C3AED),
-    Color(0xFF0EA5E9),
-    Color(0xFF10B981),
-    Color(0xFFF97316),
-    Color(0xFFE11D48),
-  ];
+  static const Color _lessonAccent = Color(0xFFFF8C00);
 
   @override
   Widget build(BuildContext context) {
@@ -191,8 +185,7 @@ class ScheduleScreen extends StatelessWidget {
                     title: day.key,
                     building: building,
                     lessons: day.value,
-                    accentResolver: (lessonIndex) =>
-                        _accentPalette[(lessonIndex) % _accentPalette.length],
+                    accentColor: _lessonAccent,
                   );
                 }, childCount: days.length),
               ),
@@ -256,16 +249,18 @@ class _Header extends StatelessWidget {
   final Color borderColor;
   final String dateLabel;
 
+  static const List<Color> _gradient = [Color(0xFF333333), Color(0xFF111111)];
+
   const _Header({required this.borderColor, required this.dateLabel});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(top: 16),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
         gradient: const LinearGradient(
-          colors: [Color(0xFF212B52), Color(0xFF1A1F32)],
+          colors: _gradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -325,13 +320,13 @@ class _DaySection extends StatelessWidget {
   final String title;
   final String building;
   final List<Schedule> lessons;
-  final Color Function(int index) accentResolver;
+  final Color accentColor;
 
   const _DaySection({
     required this.title,
     required this.building,
     required this.lessons,
-    required this.accentResolver,
+    required this.accentColor,
   });
 
   @override
@@ -356,11 +351,16 @@ class _DaySection extends StatelessWidget {
               ),
               if (building.isNotEmpty) ...[
                 const SizedBox(width: 10),
-                Flexible(child: BuildingChip(label: building)),
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: BuildingChip(label: building),
+                  ),
+                ),
               ],
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Column(
             children: List.generate(lessons.length, (index) {
               final lesson = lessons[index];
@@ -374,7 +374,7 @@ class _DaySection extends StatelessWidget {
                   teacher: lesson.teacher,
                   startTime: lesson.startTime,
                   endTime: lesson.endTime,
-                  accentColor: accentResolver(index),
+                  accentColor: accentColor,
                 ),
               );
             }),

@@ -22,12 +22,12 @@ class LessonCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF111527),
+        color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF1E2133)),
+        border: Border.all(color: const Color(0xFF333333)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withOpacity(0.5),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -57,7 +57,7 @@ class LessonCard extends StatelessWidget {
                     teacher,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.white.withOpacity(0.68),
+                      color: Colors.white.withOpacity(0.7),
                     ),
                   ),
                 ],
@@ -69,7 +69,7 @@ class LessonCard extends StatelessWidget {
                 Text(
                   startTime,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
@@ -79,7 +79,7 @@ class LessonCard extends StatelessWidget {
                   endTime,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withOpacity(0.7),
                   ),
                 ),
               ],
@@ -104,7 +104,7 @@ class _NumberBadge extends StatelessWidget {
       height: 52,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [accentColor, accentColor.withOpacity(0.7)],
+          colors: [accentColor, accentColor.withOpacity(0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
