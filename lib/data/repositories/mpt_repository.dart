@@ -77,7 +77,7 @@ class MptRepository implements SpecialtyRepositoryInterface {
         print('DEBUG: Заменяем хеш $specialtyCode на код специальности: $actualSpecialtyCode (name: $actualSpecialtyName)');
       }
       
-      final groupInfos = await parserService.parseGroups();
+      final groupInfos = await parserService.parseGroups(actualSpecialtyCode);
       print('DEBUG: Получено групп от парсера: ${groupInfos.length}');
       
       if (groupInfos.isNotEmpty) {

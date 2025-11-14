@@ -28,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Specialty? _selectedSpecialty;
   Group? _selectedGroup;
   bool _isLoading = false;
+  StateSetter? _modalStateSetter;
 
   @override
   void initState() {
@@ -79,6 +80,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _groups = groups;
         _isLoading = false;
       });
+      
+      // Обновляем состояние модального окна, если оно открыто
+      _modalStateSetter?.call(() {});
       
       // Show message if no groups found
       if (groups.isEmpty) {
@@ -265,62 +269,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.6,
-          decoration: const BoxDecoration(
-            color: Color(0xFF111111),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.all(16),
-                height: 4,
-                width: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            // Сохраняем StateSetter для обновления состояния модального окна
+            _modalStateSetter = setModalState;
+            
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.6,
+              decoration: const BoxDecoration(
+                color: Color(0xFF111111),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Выберите группу',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF8C00)))
-                    : _groups.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'Группы не найдены',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _groups.length,
-                            itemBuilder: (context, index) {
-                              final group = _groups[index];
-                              return ListTile(
-                                title: Text(
-                                  group.code,
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  _onGroupSelected(group);
-                                },
-                              );
-                            },
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.all(16),
+                    height: 4,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Выберите группу',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
                           ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF8C00)))
+                        : _groups.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Группы не найдены',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: _groups.length,
+                                itemBuilder: (context, index) {
+                                  final group = _groups[index];
+                                  return ListTile(
+                                    title: Text(
+                                      group.code,
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _onGroupSelected(group);
+                                    },
+                                  );
+                                },
+                              ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
