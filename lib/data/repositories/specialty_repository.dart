@@ -1,29 +1,39 @@
 import 'package:flutter/foundation.dart';
-import '../models/specialty.dart';
-import '../models/group.dart';
+import 'package:my_mpt/domain/entities/group.dart';
+import 'package:my_mpt/domain/entities/specialty.dart';
+import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
+import '../models/specialty.dart' as data_specialty;
+import '../models/group.dart' as data_group;
 import '../services/mock_api_service.dart';
 
-class SpecialtyRepository {
+/// Реализация репозитория для работы со специальностями и группами
+class SpecialtyRepository implements SpecialtyRepositoryInterface {
   final MockApiService _apiService = MockApiService();
 
-  /// Get all specialties
+  /// Получить все специальности
   Future<List<Specialty>> getSpecialties() async {
     try {
-      return await _apiService.getSpecialties();
+      final specialties = await _apiService.getSpecialties();
+      return specialties
+          .map((s) => Specialty(code: s.code, name: s.name))
+          .toList();
     } catch (e) {
-      // In a real app, we would handle errors appropriately
-      debugPrint('Error fetching specialties: $e');
+      // В реальном приложении мы бы обработали ошибки соответствующим образом
+      debugPrint('Ошибка при получении специальностей: $e');
       return [];
     }
   }
 
-  /// Get groups by specialty code
+  /// Получить группы по коду специальности
   Future<List<Group>> getGroupsBySpecialty(String specialtyCode) async {
     try {
-      return await _apiService.getGroupsBySpecialty(specialtyCode);
+      final groups = await _apiService.getGroupsBySpecialty(specialtyCode);
+      return groups
+          .map((g) => Group(code: g.code, specialtyCode: g.specialtyCode))
+          .toList();
     } catch (e) {
-      // In a real app, we would handle errors appropriately
-      debugPrint('Error fetching groups for specialty $specialtyCode: $e');
+      // В реальном приложении мы бы обработали ошибки соответствующим образом
+      debugPrint('Ошибка при получении групп для специальности $specialtyCode: $e');
       return [];
     }
   }

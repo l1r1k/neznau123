@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../data/models/specialty.dart';
-import '../../data/models/group.dart';
-import '../../data/repositories/specialty_repository.dart';
+import 'package:my_mpt/domain/entities/specialty.dart';
+import 'package:my_mpt/domain/entities/group.dart';
+import 'package:my_mpt/domain/usecases/get_specialties_usecase.dart';
+import 'package:my_mpt/domain/usecases/get_groups_by_specialty_usecase.dart';
+import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
+import 'package:my_mpt/data/repositories/specialty_repository.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,7 +20,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Color(0xFF111111),
   ];
 
-  late SpecialtyRepository _repository;
+  late SpecialtyRepositoryInterface _repository;
+  late GetSpecialtiesUseCase _getSpecialtiesUseCase;
+  late GetGroupsBySpecialtyUseCase _getGroupsBySpecialtyUseCase;
   List<Specialty> _specialties = [];
   List<Group> _groups = [];
   Specialty? _selectedSpecialty;
@@ -28,6 +33,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _repository = SpecialtyRepository();
+    _getSpecialtiesUseCase = GetSpecialtiesUseCase(_repository);
+    _getGroupsBySpecialtyUseCase = GetGroupsBySpecialtyUseCase(_repository);
     _loadSpecialties();
   }
 
@@ -37,7 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     
     try {
-      final specialties = await _repository.getSpecialties();
+      final specialties = await _getSpecialtiesUseCase();
       setState(() {
         _specialties = specialties;
         _isLoading = false;
@@ -61,7 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     
     try {
-      final groups = await _repository.getGroupsBySpecialty(specialtyCode);
+      final groups = await _getGroupsBySpecialtyUseCase(specialtyCode);
       setState(() {
         _groups = groups;
         _isLoading = false;

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:my_mpt/core/utils/date_formatter.dart';
 import 'package:my_mpt/domain/entities/schedule.dart';
+import 'package:my_mpt/domain/usecases/get_weekly_schedule_usecase.dart';
+import 'package:my_mpt/domain/repositories/schedule_repository_interface.dart';
+import 'package:my_mpt/data/repositories/schedule_repository.dart';
 import 'package:my_mpt/presentation/widgets/building_chip.dart';
 import 'package:my_mpt/presentation/widgets/lesson_card.dart';
 import 'package:my_mpt/presentation/widgets/break_indicator.dart';
-import '../../data/repositories/schedule_repository.dart';
 
 /// Экран "Расписание" — тёмный минималистичный лонг-лист
 class ScheduleScreen extends StatefulWidget {
@@ -17,7 +20,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   static const _backgroundColor = Color(0xFF000000);
   static const _borderColor = Color(0xFF333333);
 
-  late ScheduleRepository _repository;
+  late ScheduleRepositoryInterface _repository;
+  late GetWeeklyScheduleUseCase _getWeeklyScheduleUseCase;
   Map<String, List<Schedule>> _weeklySchedule = {};
   bool _isLoading = true;
 
@@ -27,6 +31,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   void initState() {
     super.initState();
     _repository = ScheduleRepository();
+    _getWeeklyScheduleUseCase = GetWeeklyScheduleUseCase(_repository);
     _loadScheduleData();
   }
 
@@ -36,9 +41,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     });
 
     try {
-      final scheduleData = await _repository.getScheduleData();
+      final scheduleData = await _getWeeklyScheduleUseCase();
       setState(() {
-        _weeklySchedule = scheduleData.weeklySchedule;
+        _weeklySchedule = scheduleData;
         _isLoading = false;
       });
     } catch (e) {
@@ -112,33 +117,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   String _formatDate(DateTime date) {
-    const days = [
-      'Понедельник',
-      'Вторник',
-      'Среда',
-      'Четверг',
-      'Пятница',
-      'Суббота',
-      'Воскресенье',
-    ];
-    const months = [
-      'января',
-      'февраля',
-      'марта',
-      'апреля',
-      'мая',
-      'июня',
-      'июля',
-      'августа',
-      'сентября',
-      'октября',
-      'ноября',
-      'декабря',
-    ];
-
-    final weekday = days[(date.weekday - 1) % days.length];
-    final month = months[(date.month - 1) % months.length];
-    return '$weekday, ${date.day} $month';
+    return DateFormatter.formatDayWithMonth(date);
   }
 }
 

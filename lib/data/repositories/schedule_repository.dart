@@ -1,45 +1,39 @@
 import 'package:flutter/foundation.dart';
 import 'package:my_mpt/domain/entities/schedule.dart';
+import 'package:my_mpt/domain/repositories/schedule_repository_interface.dart';
 import '../models/schedule_response.dart';
 import '../services/schedule_api_service.dart';
 
-class ScheduleRepository {
+/// Реализация репозитория для работы с расписанием
+class ScheduleRepository implements ScheduleRepositoryInterface {
   final ScheduleApiService _apiService = ScheduleApiService();
 
-  /// Get schedule data for the week
-  Future<ScheduleResponse> getScheduleData() async {
-    try {
-      return await _apiService.getScheduleData();
-    } catch (e) {
-      // In a real app, we would handle errors appropriately
-      debugPrint('Error fetching schedule data: $e');
-      // Return empty data as fallback
-      return ScheduleResponse(
-        weeklySchedule: {},
-        todaySchedule: [],
-      );
-    }
-  }
-
-  /// Get today's schedule
-  Future<List<Schedule>> getTodaySchedule() async {
-    try {
-      return await _apiService.getTodaySchedule();
-    } catch (e) {
-      // In a real app, we would handle errors appropriately
-      debugPrint('Error fetching today\'s schedule: $e');
-      return [];
-    }
-  }
-
-  /// Get weekly schedule
+  /// Получить расписание на неделю
   Future<Map<String, List<Schedule>>> getWeeklySchedule() async {
     try {
-      return await _apiService.getWeeklySchedule();
+      final response = await _apiService.getScheduleData();
+      // Поскольку ScheduleResponse уже содержит доменные сущности Schedule,
+      // мы можем вернуть weeklySchedule напрямую
+      return response.weeklySchedule;
     } catch (e) {
-      // In a real app, we would handle errors appropriately
-      debugPrint('Error fetching weekly schedule: $e');
+      // В реальном приложении мы бы обработали ошибки соответствующим образом
+      debugPrint('Ошибка при получении данных расписания: $e');
+      // Вернуть пустые данные в качестве резервного варианта
       return {};
+    }
+  }
+
+  /// Получить расписание на сегодня
+  Future<List<Schedule>> getTodaySchedule() async {
+    try {
+      final response = await _apiService.getScheduleData();
+      // Поскольку ScheduleResponse уже содержит доменные сущности Schedule,
+      // мы можем вернуть todaySchedule напрямую
+      return response.todaySchedule;
+    } catch (e) {
+      // В реальном приложении мы бы обработали ошибки соответствующим образом
+      debugPrint('Ошибка при получении расписания на сегодня: $e');
+      return [];
     }
   }
 }
