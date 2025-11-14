@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:my_mpt/domain/entities/schedule.dart';
 import 'package:my_mpt/presentation/widgets/building_chip.dart';
 import 'package:my_mpt/presentation/widgets/lesson_card.dart';
+import '../../data/repositories/schedule_repository.dart';
 
 /// Экран "Сегодня" с обновлённым тёмным стилем
-class TodayScheduleScreen extends StatelessWidget {
+class TodayScheduleScreen extends StatefulWidget {
   const TodayScheduleScreen({super.key});
 
+  @override
+  State<TodayScheduleScreen> createState() => _TodayScheduleScreenState();
+}
+
+class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
   static const _backgroundColor = Color(0xFF000000);
   static const Color _lessonAccent = Color(0xFFFF8C00);
   static const List<Color> _headerGradient = [
@@ -14,53 +20,38 @@ class TodayScheduleScreen extends StatelessWidget {
     Color(0xFF111111),
   ];
 
-  static final List<Schedule> _scheduleData = [
-    Schedule(
-      id: '1',
-      number: '1',
-      subject: 'Математика',
-      teacher: 'Иванова И.И.',
-      startTime: '08:30',
-      endTime: '09:15',
-      building: 'Нежинская',
-    ),
-    Schedule(
-      id: '2',
-      number: '2',
-      subject: 'Физика',
-      teacher: 'Петров П.П.',
-      startTime: '09:25',
-      endTime: '10:10',
-      building: 'Нахимовский',
-    ),
-    Schedule(
-      id: '3',
-      number: '3',
-      subject: 'Программирование',
-      teacher: 'Сидоров С.С.',
-      startTime: '10:30',
-      endTime: '11:15',
-      building: 'Нежинская',
-    ),
-    Schedule(
-      id: '4',
-      number: '4',
-      subject: 'Английский язык',
-      teacher: 'Козлова К.К.',
-      startTime: '11:25',
-      endTime: '12:10',
-      building: 'Нахимовский',
-    ),
-    Schedule(
-      id: '5',
-      number: '5',
-      subject: 'Физическая культура',
-      teacher: 'Васильев В.В.',
-      startTime: '12:30',
-      endTime: '13:15',
-      building: 'Нежинская',
-    ),
-  ];
+  late ScheduleRepository _repository;
+  List<Schedule> _scheduleData = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = ScheduleRepository();
+    _loadTodaySchedule();
+  }
+
+  Future<void> _loadTodaySchedule() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final schedule = await _repository.getTodaySchedule();
+      setState(() {
+        _scheduleData = schedule;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error appropriately
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка загрузки расписания')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,68 +61,73 @@ class TodayScheduleScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: _TodayHeader(
-                dateLabel: dateLabel,
-                lessonsCount: _scheduleData.length,
-                gradient: _headerGradient,
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Сегодня',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (building.isNotEmpty) ...[
-                          const SizedBox(width: 10),
-                          Flexible(
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: BuildingChip(label: building),
-                            ),
-                          ),
-                        ],
-                      ],
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF8C00)))
+            : RefreshIndicator(
+                onRefresh: _loadTodaySchedule,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _TodayHeader(
+                        dateLabel: dateLabel,
+                        lessonsCount: _scheduleData.length,
+                        gradient: _headerGradient,
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    ...List.generate(_scheduleData.length, (index) {
-                      final item = _scheduleData[index];
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          bottom: index == _scheduleData.length - 1 ? 0 : 16,
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Сегодня',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (building.isNotEmpty) ...[
+                                  const SizedBox(width: 10),
+                                  Flexible(
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: BuildingChip(label: building),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            ...List.generate(_scheduleData.length, (index) {
+                              final item = _scheduleData[index];
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: index == _scheduleData.length - 1 ? 0 : 16,
+                                ),
+                                child: LessonCard(
+                                  number: item.number,
+                                  subject: item.subject,
+                                  teacher: item.teacher,
+                                  startTime: item.startTime,
+                                  endTime: item.endTime,
+                                  accentColor: _lessonAccent,
+                                ),
+                              );
+                            }),
+                          ],
                         ),
-                        child: LessonCard(
-                          number: item.number,
-                          subject: item.subject,
-                          teacher: item.teacher,
-                          startTime: item.startTime,
-                          endTime: item.endTime,
-                          accentColor: _lessonAccent,
-                        ),
-                      );
-                    }),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

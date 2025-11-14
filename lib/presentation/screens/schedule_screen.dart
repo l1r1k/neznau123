@@ -2,163 +2,54 @@ import 'package:flutter/material.dart';
 import 'package:my_mpt/domain/entities/schedule.dart';
 import 'package:my_mpt/presentation/widgets/building_chip.dart';
 import 'package:my_mpt/presentation/widgets/lesson_card.dart';
+import '../../data/repositories/schedule_repository.dart';
 
 /// Экран "Расписание" — тёмный минималистичный лонг-лист
-class ScheduleScreen extends StatelessWidget {
+class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
 
+  @override
+  State<ScheduleScreen> createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends State<ScheduleScreen> {
   static const _backgroundColor = Color(0xFF000000);
   static const _borderColor = Color(0xFF333333);
 
-  static final Map<String, List<Schedule>> _weeklySchedule = {
-    'Понедельник': [
-      Schedule(
-        id: '1',
-        number: '1',
-        subject: 'Математика',
-        teacher: 'Иванова И.И.',
-        startTime: '08:30',
-        endTime: '09:15',
-        building: 'Нежинская',
-      ),
-      Schedule(
-        id: '2',
-        number: '2',
-        subject: 'Физика',
-        teacher: 'Петров П.П.',
-        startTime: '09:25',
-        endTime: '10:10',
-        building: 'Нахимовский',
-      ),
-      Schedule(
-        id: '3',
-        number: '3',
-        subject: 'Программирование',
-        teacher: 'Сидоров С.С.',
-        startTime: '10:30',
-        endTime: '11:15',
-        building: 'Нежинская',
-      ),
-    ],
-    'Вторник': [
-      Schedule(
-        id: '4',
-        number: '1',
-        subject: 'Английский язык',
-        teacher: 'Козлова К.К.',
-        startTime: '08:30',
-        endTime: '09:15',
-        building: 'Нахимовский',
-      ),
-      Schedule(
-        id: '5',
-        number: '2',
-        subject: 'Физическая культура',
-        teacher: 'Васильев В.В.',
-        startTime: '09:25',
-        endTime: '10:10',
-        building: 'Нежинская',
-      ),
-    ],
-    'Среда': [
-      Schedule(
-        id: '6',
-        number: '1',
-        subject: 'Математика',
-        teacher: 'Иванова И.И.',
-        startTime: '08:30',
-        endTime: '09:15',
-        building: 'Нежинская',
-      ),
-      Schedule(
-        id: '7',
-        number: '2',
-        subject: 'Программирование',
-        teacher: 'Сидоров С.С.',
-        startTime: '09:25',
-        endTime: '10:10',
-        building: 'Нахимовский',
-      ),
-      Schedule(
-        id: '8',
-        number: '3',
-        subject: 'Физика',
-        teacher: 'Петров П.П.',
-        startTime: '10:30',
-        endTime: '11:15',
-        building: 'Нежинская',
-      ),
-    ],
-    'Четверг': [
-      Schedule(
-        id: '9',
-        number: '1',
-        subject: 'Обеспечение качества функционирования КС',
-        teacher: 'Иванова И.И.',
-        startTime: '08:30',
-        endTime: '09:15',
-        building: 'Нежинская',
-      ),
-      Schedule(
-        id: '10',
-        number: '2',
-        subject: 'Иностранный язык в профессиональной деятельности',
-        teacher: 'Завьялова П.П., Завьялова П.П.',
-        startTime: '09:25',
-        endTime: '10:10',
-        building: 'Нахимовский',
-      ),
-      Schedule(
-        id: '11',
-        number: '3',
-        subject: 'Программирование',
-        teacher: 'Сидоров С.С.',
-        startTime: '10:30',
-        endTime: '11:15',
-        building: 'Нежинская',
-      ),
-      Schedule(
-        id: '12',
-        number: '4',
-        subject: 'Английский язык',
-        teacher: 'Козлова К.К.',
-        startTime: '11:25',
-        endTime: '12:10',
-        building: 'Нахимовский',
-      ),
-      Schedule(
-        id: '13',
-        number: '5',
-        subject: 'Физическая культура',
-        teacher: 'Васильев В.В.',
-        startTime: '12:30',
-        endTime: '13:15',
-        building: 'Нежинская',
-      ),
-    ],
-    'Пятница': [
-      Schedule(
-        id: '14',
-        number: '1',
-        subject: 'Физика',
-        teacher: 'Петров П.П.',
-        startTime: '08:30',
-        endTime: '09:15',
-        building: 'Нахимовский',
-      ),
-      Schedule(
-        id: '15',
-        number: '2',
-        subject: 'Математика',
-        teacher: 'Иванова И.И.',
-        startTime: '09:25',
-        endTime: '10:10',
-        building: 'Нежинская',
-      ),
-    ],
-  };
+  late ScheduleRepository _repository;
+  Map<String, List<Schedule>> _weeklySchedule = {};
+  bool _isLoading = true;
 
   static const Color _lessonAccent = Color(0xFFFF8C00);
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = ScheduleRepository();
+    _loadScheduleData();
+  }
+
+  Future<void> _loadScheduleData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final scheduleData = await _repository.getScheduleData();
+      setState(() {
+        _weeklySchedule = scheduleData.weeklySchedule;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error appropriately
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка загрузки расписания')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -167,31 +58,36 @@ class ScheduleScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: _Header(
-                borderColor: _borderColor,
-                dateLabel: _formatDate(DateTime.now()),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF8C00)))
+            : RefreshIndicator(
+                onRefresh: _loadScheduleData,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _Header(
+                        borderColor: _borderColor,
+                        dateLabel: _formatDate(DateTime.now()),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final day = days[index];
+                          final building = _primaryBuilding(day.value);
+                          return _DaySection(
+                            title: day.key,
+                            building: building,
+                            lessons: day.value,
+                            accentColor: _lessonAccent,
+                          );
+                        }, childCount: days.length),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final day = days[index];
-                  final building = _primaryBuilding(day.value);
-                  return _DaySection(
-                    title: day.key,
-                    building: building,
-                    lessons: day.value,
-                    accentColor: _lessonAccent,
-                  );
-                }, childCount: days.length),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
