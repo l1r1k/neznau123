@@ -28,10 +28,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<Group> _groups = [];
   Specialty? _selectedSpecialty;
   Group? _selectedGroup;
+  String? _selectedSpecialtyCode;
   bool _isLoading = false;
   StateSetter? _modalStateSetter;
 
   static const String _selectedGroupKey = 'selected_group';
+  static const String _selectedSpecialtyKey = 'selected_specialty';
 
   @override
   void initState() {
@@ -40,7 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _getSpecialtiesUseCase = GetSpecialtiesUseCase(_repository);
     _getGroupsBySpecialtyUseCase = GetGroupsBySpecialtyUseCase(_repository);
     _loadSpecialties();
-    _loadSelectedGroup();
+    _loadSelectedPreferences();
   }
 
   Future<void> _loadSpecialties() async {
@@ -65,20 +67,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _loadSelectedGroup() async {
+  Future<void> _loadSelectedPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final selectedGroupCode = prefs.getString(_selectedGroupKey);
+      final selectedSpecialtyCode = prefs.getString(_selectedSpecialtyKey);
+      final selectedSpecialtyName = prefs.getString(
+        '${_selectedSpecialtyKey}_name',
+      );
 
-      if (selectedGroupCode != null && selectedGroupCode.isNotEmpty) {
-        // Здесь можно загрузить информацию о группе, если это необходимо
-        // Пока просто устанавливаем состояние
-        setState(() {
+      setState(() {
+        if (selectedGroupCode != null && selectedGroupCode.isNotEmpty) {
+          // Здесь можно загрузить информацию о группе, если это необходимо
+          // Пока просто устанавливаем состояние
           _selectedGroup = Group(code: selectedGroupCode, specialtyCode: '');
-        });
-      }
+        }
+
+        if (selectedSpecialtyCode != null && selectedSpecialtyCode.isNotEmpty) {
+          _selectedSpecialtyCode = selectedSpecialtyCode;
+
+          if (selectedSpecialtyName != null &&
+              selectedSpecialtyName.isNotEmpty) {
+            _selectedSpecialty = Specialty(
+              code: selectedSpecialtyCode,
+              name: selectedSpecialtyName,
+            );
+          }
+          else if (_specialties.isNotEmpty) {
+            final selectedSpecialty = _specialties.firstWhere(
+              (specialty) => specialty.code == selectedSpecialtyCode,
+              orElse: () => Specialty(code: '', name: ''),
+            );
+
+            if (selectedSpecialty.code.isNotEmpty) {
+              _selectedSpecialty = selectedSpecialty;
+            }
+          }
+        }
+      });
     } catch (e) {
-      print('DEBUG: Ошибка загрузки выбранной группы: $e');
+      print('DEBUG: Ошибка загрузки выбранных настроек: $e');
     }
   }
 
@@ -133,14 +161,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _onSpecialtySelected(Specialty specialty) {
+  void _onSpecialtySelected(Specialty specialty) async {
     print(
       'DEBUG: Выбрана специальность: ${specialty.code} - ${specialty.name}',
     );
     setState(() {
       _selectedSpecialty = specialty;
+      _selectedSpecialtyCode = specialty.code; // Also store the code
       _selectedGroup = null;
     });
+
+    // Сохраняем выбранную специальность в настройки
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_selectedSpecialtyKey, specialty.code);
+      // Also save the specialty name for immediate display
+      await prefs.setString('${_selectedSpecialtyKey}_name', specialty.name);
+    } catch (e) {
+      print('DEBUG: Ошибка сохранения выбранной специальности: $e');
+    }
+
     _loadGroups(specialty.code);
   }
 
@@ -210,24 +250,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 28),
               const _Section(title: 'Дополнительно'),
               const SizedBox(height: 14),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF111111),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: const ListTile(
-                  leading: Icon(Icons.info_outline, color: Color(0xFFFF8C00)),
-                  title: Text(
-                    'О приложении',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+              GestureDetector(
+                onTap: _showAboutDialog,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111111),
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  trailing: Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: Colors.white54,
+                  child: const ListTile(
+                    leading: Icon(Icons.info_outline, color: Color(0xFFFF8C00)),
+                    title: Text(
+                      'О приложении',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    trailing: Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Colors.white54,
+                    ),
                   ),
                 ),
               ),
@@ -235,6 +278,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF111111),
+          title: const Text(
+            'О приложении',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Приложение создано студентами группы П50-1-22',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text(
+                'Закрыть',
+                style: TextStyle(color: Color(0xFFFF8C00)),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
