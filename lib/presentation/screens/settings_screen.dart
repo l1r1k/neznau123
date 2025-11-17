@@ -6,6 +6,7 @@ import 'package:my_mpt/domain/usecases/get_groups_by_specialty_usecase.dart';
 import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
 import 'package:my_mpt/data/repositories/mpt_repository.dart' as repo_impl;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -92,8 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               code: selectedSpecialtyCode,
               name: selectedSpecialtyName,
             );
-          }
-          else if (_specialties.isNotEmpty) {
+          } else if (_specialties.isNotEmpty) {
             final selectedSpecialty = _specialties.firstWhere(
               (specialty) => specialty.code == selectedSpecialtyCode,
               orElse: () => Specialty(code: '', name: ''),
@@ -246,6 +246,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: 'Связаться с разработчиком',
                 subtitle: 'Сообщить об ошибке или предложить улучшение',
                 icon: Icons.chat_outlined,
+                onTap: _openSupportLink,
               ),
               const SizedBox(height: 28),
               const _Section(title: 'Дополнительно'),
@@ -309,6 +310,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
+  }
+
+  /// Открывает ссылку поддержки в Telegram
+  Future<void> _openSupportLink() async {
+    final Uri supportUri = Uri.parse('https://telegram.me/MptSupportBot');
+    if (!await launchUrl(supportUri)) {
+      // Показываем сообщение об ошибке, если не удалось открыть ссылку
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть ссылку поддержки')),
+        );
+      }
+    }
   }
 
   void _showSpecialtySelector() {
