@@ -97,8 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       setState(() {
         if (selectedGroupCode != null && selectedGroupCode.isNotEmpty) {
-          // Здесь можно загрузить информацию о группе, если это необходимо
-          // Пока просто устанавливаем состояние
+          // Устанавливаем выбранную группу, она будет проверена в _loadGroups
           _selectedGroup = Group(code: selectedGroupCode, specialtyCode: '');
         }
 
@@ -120,6 +119,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (selectedSpecialty.code.isNotEmpty) {
               _selectedSpecialty = selectedSpecialty;
             }
+          }
+          
+          // Загружаем группы для выбранной специальности
+          if (_selectedSpecialty != null && _selectedSpecialty!.code.isNotEmpty) {
+            // Добавляем небольшую задержку для корректной инициализации
+            Future.delayed(const Duration(milliseconds: 100), () {
+              _loadGroups(_selectedSpecialty!.code);
+            });
           }
         }
       });
@@ -234,15 +241,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _isLoading = true;
       _groups = [];
-      _selectedGroup = null;
+      // Не сбрасываем _selectedGroup здесь, чтобы сохранить выбранную группу
     });
 
     try {
       final groups = await _getGroupsBySpecialtyUseCase(specialtyCode);
       print('DEBUG: Получено групп: ${groups.length}');
+      
+      // Загружаем выбранную группу, если она была сохранена
+      Group? selectedGroup;
+      if (_selectedGroup != null) {
+        // Проверяем, существует ли выбранная группа в новом списке
+        selectedGroup = groups.firstWhere(
+          (group) => group.code == _selectedGroup!.code,
+          orElse: () => Group(code: '', specialtyCode: ''),
+        );
+        
+        // Если группа не найдена, сбрасываем выбор
+        if (selectedGroup.code.isEmpty) {
+          selectedGroup = null;
+        }
+      } else {
+        // Проверяем, есть ли сохраненная группа в настройках
+        final prefs = await SharedPreferences.getInstance();
+        final savedGroupCode = prefs.getString(_selectedGroupKey);
+        if (savedGroupCode != null && savedGroupCode.isNotEmpty) {
+          selectedGroup = groups.firstWhere(
+            (group) => group.code == savedGroupCode,
+            orElse: () => Group(code: '', specialtyCode: ''),
+          );
+          
+          // Если группа не найдена, сбрасываем выбор
+          if (selectedGroup.code.isEmpty) {
+            selectedGroup = null;
+          }
+        }
+      }
+      
       setState(() {
         _groups = groups;
         _isLoading = false;
+        _selectedGroup = selectedGroup;
       });
 
       // Обновляем состояние модального окна, если оно открыто
