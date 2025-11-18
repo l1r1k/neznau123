@@ -7,17 +7,21 @@ class BuildingChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (label.isEmpty) return const SizedBox.shrink();
-
     // Определяем цвета в зависимости от названия здания
     Color borderColor = const Color(0xFFFF8C00).withOpacity(0.3); // Оранжевый по умолчанию
     Color circleColor = const Color(0xFFFF8C00); // Оранжевый по умолчанию
+    String displayLabel = label;
     
     if (label == 'Нежинская') {
       borderColor = const Color(0xFF2196F3).withOpacity(0.3); // Синий для Нежинской
       circleColor = const Color(0xFF2196F3); // Синий для Нежинской
+    } else if (label != 'Нахимовский' && label != 'Нежинская') {
+      // Если здание не Наxимовский и не Нежинская, показываем "Дистанционно"
+      displayLabel = 'Дистанционно';
+      borderColor = const Color(0xFF9C27B0).withOpacity(0.3); // Фиолетовый для дистанционных занятий
+      circleColor = const Color(0xFF9C27B0); // Фиолетовый для дистанционных занятий
     }
-
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
@@ -45,7 +49,7 @@ class BuildingChip extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            label,
+            displayLabel,
             style: const TextStyle(
               fontSize: 13,
               color: Colors.white,

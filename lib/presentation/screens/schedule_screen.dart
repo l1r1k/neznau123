@@ -453,15 +453,13 @@ class _DaySection extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (building.isNotEmpty) ...[
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: BuildingChip(label: building),
-                  ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: BuildingChip(label: building),
                 ),
-              ],
+              ),
             ],
           ),
           const SizedBox(height: 20),
