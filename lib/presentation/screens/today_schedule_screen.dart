@@ -192,7 +192,7 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
                   ),
                   // Добавляем индикатор страниц внизу экрана
                   Positioned(
-                    bottom: 16,
+                    bottom: 10,
                     left: 0,
                     right: 0,
                     child: _PageIndicator(currentPageIndex: _currentPageIndex),
@@ -379,7 +379,7 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
                           return Padding(
                             padding: EdgeInsets.only(
                               bottom: index == scheduleWithChanges.length - 1
-                                  ? 0
+                                  ? 14
                                   : 14,
                             ),
                             child: Column(children: widgets),
