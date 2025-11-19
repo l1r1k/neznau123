@@ -7,8 +7,13 @@ import 'package:flutter/material.dart';
 class BuildingChip extends StatelessWidget {
   /// Название корпуса
   final String label;
+  final bool showOverrideIndicator;
 
-  const BuildingChip({super.key, required this.label});
+  const BuildingChip({
+    super.key,
+    required this.label,
+    this.showOverrideIndicator = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +40,7 @@ class BuildingChip extends StatelessWidget {
       ); // Фиолетовый для дистанционных занятий
     }
 
-    return Container(
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF111111),
@@ -71,6 +76,23 @@ class BuildingChip extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (!showOverrideIndicator) {
+      return chip;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.info_outline,
+          size: 16,
+          color: Colors.redAccent,
+        ),
+        const SizedBox(width: 8),
+        chip,
+      ],
     );
   }
 }

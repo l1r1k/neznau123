@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_mpt/core/utils/date_formatter.dart';
+import 'package:my_mpt/core/utils/lesson_details_parser.dart';
 import 'package:my_mpt/domain/entities/schedule.dart';
 import 'package:my_mpt/domain/entities/schedule_change.dart';
 import 'package:my_mpt/domain/usecases/get_today_schedule_usecase.dart';
@@ -185,62 +186,30 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
       weekType,
     );
 
-    final building = _primaryBuilding(filteredScheduleData);
-    final dateLabel = _formatDate(targetDate);
-
-    // Если нет уроков, показываем сообщение о выходном дне
-    if (filteredScheduleData.isEmpty) {
-      return CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: _TodayHeader(
-              dateLabel: dateLabel,
-              lessonsCount: filteredScheduleData.length,
-              gradient: _headerGradient,
-              pageTitle: pageTitle,
-              weekType: weekType ?? _weekInfo?.weekType ?? 'Неизвестно',
-            ),
-          ),
-          SliverFillRemaining(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.weekend_outlined,
-                    size: 64,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Сегодня выходной',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white70,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Нет запланированных занятий',
-                    style: TextStyle(fontSize: 16, color: Colors.white54),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
+    final filteredChanges = _getFilteredScheduleChanges(pageTitle);
     final callsData = CallsService.getCalls();
+    final _ScheduleChangesResult changesResult = filteredChanges.isEmpty
+        ? _ScheduleChangesResult(
+            schedule: filteredScheduleData,
+            hasBuildingOverride: false,
+          )
+        : _applyScheduleChanges(
+            filteredScheduleData,
+            filteredChanges,
+            callsData,
+          );
+    final scheduleWithChanges = changesResult.schedule;
+    final hasBuildingOverride = changesResult.hasBuildingOverride;
+
+    final building = _primaryBuilding(scheduleWithChanges);
+    final dateLabel = _formatDate(targetDate);
 
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
           child: _TodayHeader(
             dateLabel: dateLabel,
-            lessonsCount: filteredScheduleData.length,
+            lessonsCount: scheduleWithChanges.length,
             gradient: _headerGradient,
             pageTitle: pageTitle,
             weekType: weekType ?? _weekInfo?.weekType ?? 'Неизвестно',
@@ -271,7 +240,10 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
                       Flexible(
                         child: Align(
                           alignment: Alignment.centerRight,
-                          child: BuildingChip(label: building),
+                          child: BuildingChip(
+                            label: building,
+                            showOverrideIndicator: hasBuildingOverride,
+                          ),
                         ),
                       ),
                     ],
@@ -282,113 +254,134 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
                     children: [
-                      // Отображаем основное расписание
-                      ...List.generate(filteredScheduleData.length, (index) {
-                        final item = filteredScheduleData[index];
-
-                        String lessonStartTime = item.startTime;
-                        String lessonEndTime = item.endTime;
-
-                        try {
-                          final periodInt = int.tryParse(item.number);
-                          if (periodInt != null &&
-                              periodInt > 0 &&
-                              periodInt <= callsData.length) {
-                            final call = callsData[periodInt - 1];
-                            lessonStartTime = call.startTime;
-                            lessonEndTime = call.endTime;
-                          }
-                        } catch (e) {
-                          // Потом
-                        }
-
-                        final widgets = <Widget>[
-                          LessonCard(
-                            number: item.number,
-                            subject: item.subject,
-                            teacher: item.teacher,
-                            startTime: lessonStartTime,
-                            endTime: lessonEndTime,
-                            accentColor: _lessonAccent,
+                      if (scheduleWithChanges.isEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 48),
+                          alignment: Alignment.center,
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.weekend_outlined,
+                                size: 64,
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Сегодня выходной',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Нет запланированных занятий',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                            ],
                           ),
-                        ];
+                        ),
+                      ] else ...[
+                        ...List.generate(scheduleWithChanges.length, (index) {
+                          final item = scheduleWithChanges[index];
 
-                        if (index < filteredScheduleData.length - 1) {
-                          String nextLessonStartTime =
-                              filteredScheduleData[index + 1].startTime;
+                          String lessonStartTime = item.startTime;
+                          String lessonEndTime = item.endTime;
 
                           try {
-                            final nextPeriodInt = int.tryParse(
-                              filteredScheduleData[index + 1].number,
-                            );
-                            if (nextPeriodInt != null &&
-                                nextPeriodInt > 0 &&
-                                nextPeriodInt <= callsData.length) {
-                              final nextCall = callsData[nextPeriodInt - 1];
-                              nextLessonStartTime = nextCall.startTime;
+                            final periodInt = int.tryParse(item.number);
+                            if (periodInt != null &&
+                                periodInt > 0 &&
+                                periodInt <= callsData.length) {
+                              final call = callsData[periodInt - 1];
+                              lessonStartTime = call.startTime;
+                              lessonEndTime = call.endTime;
                             }
                           } catch (e) {
                             // Потом
                           }
 
-                          widgets.add(
-                            BreakIndicator(
-                              startTime: lessonEndTime,
-                              endTime: nextLessonStartTime,
+                          final widgets = <Widget>[
+                            LessonCard(
+                              number: item.number,
+                              subject: item.subject,
+                              teacher: item.teacher,
+                              startTime: lessonStartTime,
+                              endTime: lessonEndTime,
+                              accentColor: _lessonAccent,
                             ),
-                          );
-                        }
+                          ];
 
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            bottom: index == filteredScheduleData.length - 1
-                                ? 0
-                                : 14,
+                          if (index < scheduleWithChanges.length - 1) {
+                            String nextLessonStartTime =
+                                scheduleWithChanges[index + 1].startTime;
+
+                            try {
+                              final nextPeriodInt = int.tryParse(
+                                scheduleWithChanges[index + 1].number,
+                              );
+                              if (nextPeriodInt != null &&
+                                  nextPeriodInt > 0 &&
+                                  nextPeriodInt <= callsData.length) {
+                                final nextCall = callsData[nextPeriodInt - 1];
+                                nextLessonStartTime = nextCall.startTime;
+                              }
+                            } catch (e) {
+                              // Потом
+                            }
+
+                            widgets.add(
+                              BreakIndicator(
+                                startTime: lessonEndTime,
+                                endTime: nextLessonStartTime,
+                              ),
+                            );
+                          }
+
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              bottom: index == scheduleWithChanges.length - 1
+                                  ? 0
+                                  : 14,
+                            ),
+                            child: Column(children: widgets),
+                          );
+                        }),
+                      ],
+                      if (filteredChanges.isNotEmpty) ...[
+                        const SizedBox(height: 30),
+                        const Divider(
+                          color: Color(0xFF333333),
+                          thickness: 1,
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Изменения в расписании',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
                           ),
-                          child: Column(children: widgets),
-                        );
-                      }),
-                      // Отображаем изменения в расписании, если они есть (только для соответствующего дня)
-                      ...() {
-                        final filteredChanges = _getFilteredScheduleChanges(
-                          pageTitle,
-                        );
-                        if (filteredChanges.isNotEmpty) {
-                          return [
-                              const SizedBox(height: 30),
-                              const Divider(
-                                color: Color(0xFF333333),
-                                thickness: 1,
+                        ),
+                        const SizedBox(height: 12),
+                        ...filteredChanges.whereType<ScheduleChangeEntity>().map(
+                          (change) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: ScheduleChangeCard(
+                                lessonNumber: change.lessonNumber,
+                                replaceFrom: change.replaceFrom,
+                                replaceTo: change.replaceTo,
                               ),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'Изменения в расписании',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                            ]
-                            ..addAll(
-                              filteredChanges.map((change) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 14),
-                                  child: ScheduleChangeCard(
-                                    lessonNumber: change!.lessonNumber,
-                                    replaceFrom: change.replaceFrom,
-                                    replaceTo: change.replaceTo,
-                                    updatedAt: change.updatedAt,
-                                    changeDate: change.changeDate,
-                                  ),
-                                );
-                              }).toList(),
-                            )
-                            ..add(const SizedBox(height: 20));
-                        }
-                        return [];
-                      }(),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                     ],
                   ),
                 ),
@@ -491,6 +484,135 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
     });
 
     return filteredSchedule;
+  }
+
+  _ScheduleChangesResult _applyScheduleChanges(
+    List<Schedule> schedule,
+    List<ScheduleChangeEntity?> changes,
+    List callsData,
+  ) {
+    if (changes.isEmpty) {
+      return _ScheduleChangesResult(
+        schedule: List<Schedule>.from(schedule),
+        hasBuildingOverride: false,
+      );
+    }
+
+    final List<Schedule> result = List<Schedule>.from(schedule);
+    bool hasBuildingOverride = false;
+
+    for (final change in changes.whereType<ScheduleChangeEntity>()) {
+      final lessonNumber = change.lessonNumber.trim();
+      if (lessonNumber.isEmpty) continue;
+
+      final normalizedReplaceTo =
+          change.replaceTo.replaceAll('\u00A0', ' ').trim();
+      final shouldHide = _shouldHideLessonFromOverview(normalizedReplaceTo);
+      final existingIndex =
+          result.indexWhere((lesson) => lesson.number.trim() == lessonNumber);
+
+      if (shouldHide) {
+        if (existingIndex != -1) {
+          result.removeAt(existingIndex);
+        }
+        continue;
+      }
+
+      final parsedDetails = parseLessonDetails(normalizedReplaceTo);
+      final subject = parsedDetails.subject.isNotEmpty
+          ? parsedDetails.subject
+          : normalizedReplaceTo;
+      final teacher = parsedDetails.teacher;
+
+      final updatedBuilding = _resolveBuildingFromChange(
+        normalizedReplaceTo,
+        existingIndex != -1 ? result[existingIndex].building : '',
+      );
+      if (updatedBuilding.isNotEmpty &&
+          existingIndex != -1 &&
+          updatedBuilding != result[existingIndex].building) {
+        hasBuildingOverride = true;
+      }
+
+      if (existingIndex != -1) {
+        final existing = result[existingIndex];
+        result[existingIndex] = Schedule(
+          id: existing.id,
+          number: existing.number,
+          subject: subject,
+          teacher: teacher.isNotEmpty ? teacher : existing.teacher,
+          startTime: existing.startTime,
+          endTime: existing.endTime,
+          building:
+              updatedBuilding.isNotEmpty ? updatedBuilding : existing.building,
+          lessonType: existing.lessonType,
+        );
+      } else {
+        final timing = _lessonTimingForNumber(lessonNumber, callsData);
+        result.add(
+          Schedule(
+            id: 'change_${lessonNumber}_${change.updatedAt}',
+            number: lessonNumber,
+            subject: subject,
+            teacher: teacher,
+            startTime: timing.start,
+            endTime: timing.end,
+            building:
+                updatedBuilding.isNotEmpty ? updatedBuilding : 'Дистанционно',
+            lessonType: null,
+          ),
+        );
+        if (updatedBuilding.isNotEmpty) {
+          hasBuildingOverride = true;
+        }
+      }
+    }
+
+    result.sort((a, b) {
+      final aNumber = _tryParseLessonNumber(a.number);
+      final bNumber = _tryParseLessonNumber(b.number);
+      if (aNumber != null && bNumber != null) {
+        return aNumber.compareTo(bNumber);
+      }
+      return a.number.compareTo(b.number);
+    });
+
+    return _ScheduleChangesResult(
+      schedule: result,
+      hasBuildingOverride: hasBuildingOverride,
+    );
+  }
+
+  bool _shouldHideLessonFromOverview(String replaceTo) {
+    final normalized = replaceTo.toLowerCase();
+    return normalized.startsWith('занятие отменено') ||
+        normalized.startsWith('занятие перенесено на');
+  }
+
+  String _resolveBuildingFromChange(
+    String replaceTo,
+    String fallbackBuilding,
+  ) {
+    final upper = replaceTo.toUpperCase();
+    if (upper.contains('НЕЖИНСК')) return 'Нежинская';
+    if (upper.contains('НАХИМОВ')) return 'Нахимовский';
+    return fallbackBuilding;
+  }
+
+  _LessonTiming _lessonTimingForNumber(String lessonNumber, List callsData) {
+    final sanitized = lessonNumber.trim();
+    for (final call in callsData) {
+      if (call.period == sanitized) {
+        return _LessonTiming(start: call.startTime, end: call.endTime);
+      }
+    }
+    return const _LessonTiming(start: '--:--', end: '--:--');
+  }
+
+  int? _tryParseLessonNumber(String value) {
+    final match = RegExp(r'\d+').firstMatch(value);
+    if (match == null) return null;
+    return int.tryParse(match.group(0)!);
   }
 
   String _primaryBuilding(List<Schedule> schedule) {
@@ -647,4 +769,21 @@ class _MetricChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LessonTiming {
+  final String start;
+  final String end;
+
+  const _LessonTiming({required this.start, required this.end});
+}
+
+class _ScheduleChangesResult {
+  final List<Schedule> schedule;
+  final bool hasBuildingOverride;
+
+  _ScheduleChangesResult({
+    required this.schedule,
+    required this.hasBuildingOverride,
+  });
 }

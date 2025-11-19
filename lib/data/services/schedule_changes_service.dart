@@ -111,7 +111,12 @@ class ScheduleChangesService {
                     if (table != null) {
                       // Проверяем, содержит ли таблица изменения для нашей группы
                       final caption = table.querySelector('caption');
-                      if (caption != null && caption.text.contains(groupCode)) {
+                      final normalizedGroupCode = groupCode.trim().toUpperCase();
+                      final captionText =
+                          caption?.text.trim().toUpperCase() ?? '';
+                      if (caption != null &&
+                          normalizedGroupCode.isNotEmpty &&
+                          captionText.contains(normalizedGroupCode)) {
                         // Ищем все строки с изменениями
                         final rows = table.querySelectorAll('tr');
 

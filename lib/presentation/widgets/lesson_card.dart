@@ -78,6 +78,7 @@ class LessonCard extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(width: 16),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
