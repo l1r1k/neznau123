@@ -6,6 +6,9 @@ import 'package:my_mpt/domain/usecases/get_groups_by_specialty_usecase.dart';
 import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
 import 'package:my_mpt/data/repositories/mpt_repository.dart' as repo_impl;
 import 'package:my_mpt/data/repositories/unified_schedule_repository.dart';
+import 'package:my_mpt/presentation/widgets/success_notification.dart';
+import 'package:my_mpt/presentation/widgets/error_notification.dart';
+import 'package:my_mpt/presentation/widgets/info_notification.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -66,7 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
       // Handle error appropriately
       if (context.mounted) {
-        _showErrorSnackBar(
+        showErrorNotification(
           context,
           'Ошибка загрузки',
           'Не удалось загрузить специальности',
@@ -184,204 +187,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  /// Показывает красивое уведомление об успехе
-  void _showSuccessSnackBar(
-    BuildContext context,
-    String title,
-    String message,
-    IconData icon,
-  ) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Container(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: Colors.green,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (message.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        message,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        backgroundColor: const Color(0xFF1A1A1A),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  /// Показывает красивое уведомление об ошибке
-  void _showErrorSnackBar(
-    BuildContext context,
-    String title,
-    String message,
-    IconData icon,
-  ) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Container(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: Colors.red,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (message.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        message,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        backgroundColor: const Color(0xFF1A1A1A),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  /// Показывает красивое информационное уведомление
-  void _showInfoSnackBar(
-    BuildContext context,
-    String title,
-    String message,
-    IconData icon,
-  ) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Container(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF8C00).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.info_outline,
-                  color: Color(0xFFFF8C00),
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (message.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        message,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        backgroundColor: const Color(0xFF1A1A1A),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
   /// Обновляет расписание
   Future<void> _refreshSchedule() async {
     setState(() {
@@ -394,14 +199,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final selectedGroupCode = prefs.getString(_selectedGroupKey);
 
       if (selectedGroupCode == null || selectedGroupCode.isEmpty) {
-      if (context.mounted) {
-        _showInfoSnackBar(
-          context,
-          'Выберите группу',
-          'Сначала выберите специальность и группу',
-          Icons.info_outline,
-        );
-      }
+        if (context.mounted) {
+          showInfoNotification(
+            context,
+            'Выберите группу',
+            'Сначала выберите специальность и группу',
+            Icons.info_outline,
+          );
+        }
         setState(() {
           _isRefreshing = false;
         });
@@ -425,7 +230,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
 
       if (context.mounted) {
-        _showSuccessSnackBar(
+        showSuccessNotification(
           context,
           'Расписание обновлено',
           'Данные успешно загружены',
@@ -438,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
 
       if (context.mounted) {
-        _showErrorSnackBar(
+        showErrorNotification(
           context,
           'Ошибка обновления',
           'Не удалось обновить расписание',
@@ -457,13 +262,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       // Добавляем таймаут для предотвращения бесконечной загрузки
-      final groups = await _getGroupsBySpecialtyUseCase(specialtyCode)
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw Exception('Превышено время ожидания загрузки групп');
-            },
-          );
+      final groups = await _getGroupsBySpecialtyUseCase(specialtyCode).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Превышено время ожидания загрузки групп');
+        },
+      );
 
       // Загружаем выбранную группу, если она была сохранена
       Group? selectedGroup;
@@ -504,7 +308,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       });
 
-
       // Force refresh the UI
       setState(() {});
     } catch (e) {
@@ -513,7 +316,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
       // Handle error appropriately
       if (context.mounted) {
-        _showErrorSnackBar(
+        showErrorNotification(
           context,
           'Ошибка загрузки',
           'Не удалось загрузить группы. Попробуйте еще раз.',
@@ -559,7 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       // Show confirmation
       if (context.mounted) {
-        _showSuccessSnackBar(
+        showSuccessNotification(
           context,
           'Группа выбрана',
           '${group.code} • Расписание обновлено',
@@ -568,7 +371,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        _showErrorSnackBar(
+        showErrorNotification(
           context,
           'Группа выбрана',
           '${group.code} • Ошибка обновления расписания',
@@ -738,7 +541,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!await launchUrl(supportUri)) {
       // Показываем сообщение об ошибке, если не удалось открыть ссылку
       if (context.mounted) {
-        _showErrorSnackBar(
+        showErrorNotification(
           context,
           'Ошибка',
           'Не удалось открыть ссылку поддержки',
