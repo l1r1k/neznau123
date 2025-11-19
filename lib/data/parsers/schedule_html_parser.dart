@@ -84,55 +84,48 @@ class ScheduleHtmlParser {
   /// Возвращает:
   /// - Element?: Элемент tab-pane для группы или null, если не найден
   Element? _findTabPaneForGroup(Document document, String groupCode) {
-    // Ищем все ссылки на вкладки в навигационном меню
-    final tabLinks = document.querySelectorAll('ul.nav-tabs a');
+    // Нормализуем код группы для поиска
+    final normalizedGroupCode = groupCode.trim().toUpperCase();
+    
+    // Ищем все ссылки на вкладки в навигационном меню (строгий селектор)
+    final tabLinks = document.querySelectorAll('ul.nav-tabs > li > a[href^="#"]');
     String? tabId;
 
     // Пробуем найти точное совпадение кода группы
-    tabId ??= _findTabId(tabLinks, (text) => text == groupCode);
+    for (var link in tabLinks) {
+      final text = link.text.trim().toUpperCase();
+      if (text == normalizedGroupCode) {
+        final href = link.attributes['href'];
+        if (href != null && href.startsWith('#')) {
+          tabId = href.substring(1);
+          break;
+        }
+      }
+    }
+
     // Если точное совпадение не найдено, ищем частичное совпадение
-    tabId ??= _findTabId(tabLinks, (text) => text.contains(groupCode));
+    if (tabId == null) {
+      for (var link in tabLinks) {
+        final text = link.text.trim().toUpperCase();
+        if (text.contains(normalizedGroupCode) || normalizedGroupCode.contains(text)) {
+          final href = link.attributes['href'];
+          if (href != null && href.startsWith('#')) {
+            tabId = href.substring(1);
+            break;
+          }
+        }
+      }
+    }
 
     // Если ID вкладки не найден, возвращаем null
-    if (tabId == null) {
+    if (tabId == null || tabId.isEmpty) {
       return null;
     }
 
-    // Возвращаем элемент tab-pane с найденным ID
-    return document.querySelector('div[role="tabpanel"][id="$tabId"]');
+    // Возвращаем элемент tab-pane с найденным ID (строгий селектор)
+    return document.querySelector('[role="tabpanel"][id="$tabId"]');
   }
 
-  /// Находит ID вкладки по условию
-  ///
-  /// Метод ищет ссылку на вкладку, удовлетворяющую указанному условию,
-  /// и возвращает её ID
-  ///
-  /// Параметры:
-  /// - [links]: Список ссылок на вкладки
-  /// - [predicate]: Условие для поиска
-  ///
-  /// Возвращает:
-  /// - String?: ID вкладки или null, если не найдена
-  String? _findTabId(
-    List<Element> links,
-    bool Function(String text) predicate,
-  ) {
-    // Проходим по всем ссылкам
-    for (final link in links) {
-      // Извлекаем текст ссылки
-      final text = link.text.trim();
-      // Проверяем, удовлетворяет ли текст условию
-      if (!predicate(text)) continue;
-
-      // Извлекаем атрибут href
-      final href = link.attributes['href'];
-      // Если href начинается с #, возвращаем ID (без #)
-      if (href != null && href.startsWith('#')) {
-        return href.substring(1);
-      }
-    }
-    return null;
-  }
 
   /// Извлекает день недели из заголовка таблицы
   ///

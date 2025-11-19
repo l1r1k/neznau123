@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart';
 import 'package:my_mpt/data/models/tab_info.dart';
 import 'package:my_mpt/data/models/week_info.dart';
 import 'package:my_mpt/data/models/group_info.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Сервис для парсинга данных с сайта МПТ
 ///
@@ -13,6 +15,15 @@ class MptParserService {
   /// Базовый URL сайта с расписанием
   final String baseUrl = 'https://mpt.ru/raspisanie/';
 
+  /// Время жизни кэша (48 часов)
+  static const Duration _cacheTtl = Duration(hours: 48);
+
+  /// Ключи для кэширования
+  static const String _cacheKeyTabs = 'mpt_parser_tabs';
+  static const String _cacheKeyTabsTimestamp = 'mpt_parser_tabs_timestamp';
+  static const String _cacheKeyGroups = 'mpt_parser_groups_';
+  static const String _cacheKeyGroupsTimestamp = 'mpt_parser_groups_timestamp_';
+
   /// Парсит список вкладок специальностей с главной страницы расписания
   ///
   /// Метод извлекает HTML-страницу с расписанием и находит все вкладки специальностей,
@@ -20,8 +31,16 @@ class MptParserService {
   ///
   /// Возвращает:
   /// - List<TabInfo>: Список информации о вкладках специальностей
-  Future<List<TabInfo>> parseTabList() async {
+  Future<List<TabInfo>> parseTabList({bool forceRefresh = false}) async {
     try {
+      // Проверяем кэш
+      if (!forceRefresh) {
+        final cachedTabs = await _getCachedTabs();
+        if (cachedTabs != null) {
+          return cachedTabs;
+        }
+      }
+
       // Отправляем HTTP-запрос к странице с расписанием
       final response = await http
           .get(Uri.parse(baseUrl))
@@ -37,7 +56,7 @@ class MptParserService {
         // Парсим HTML документ с помощью библиотеки html
         final document = parser.parse(response.body);
 
-        // Ищем элемент навигационного меню со списком вкладок
+        // Ищем элемент навигационного меню со списком вкладок (более строгий селектор)
         final tablist = document.querySelector('ul[role="tablist"]');
 
         // Проверяем наличие элемента
@@ -45,30 +64,29 @@ class MptParserService {
           throw Exception('Элемент навигационного меню не найден на странице');
         }
 
-        // Ищем все элементы вкладок в навигационном меню
-        final tabItems = tablist.querySelectorAll('li[role="presentation"]');
+        // Ищем все элементы вкладок в навигационном меню (строгий селектор)
+        final tabItems = tablist.querySelectorAll('li[role="presentation"] > a[href^="#"]');
 
         // Создаем список для хранения информации о вкладках
         final List<TabInfo> tabs = [];
 
         // Проходим по всем вкладкам и извлекаем информацию
-        for (var item in tabItems) {
-          // Ищем ссылку внутри элемента вкладки
-          final anchor = item.querySelector('a');
-          if (anchor != null) {
-            // Извлекаем атрибуты ссылки
-            final href = anchor.attributes['href'];
-            final ariaControls = anchor.attributes['aria-controls'];
-            final name = anchor.text?.trim() ?? '';
+        for (var anchor in tabItems) {
+          // Извлекаем атрибуты ссылки
+          final href = anchor.attributes['href'];
+          final ariaControls = anchor.attributes['aria-controls'];
+          final name = anchor.text.trim();
 
-            // Добавляем информацию о вкладке в список, если есть необходимые атрибуты
-            if (href != null && ariaControls != null) {
-              tabs.add(
-                TabInfo(href: href, ariaControls: ariaControls, name: name),
-              );
-            }
+          // Добавляем информацию о вкладке в список, если есть необходимые атрибуты
+          if (href != null && href.startsWith('#') && ariaControls != null && name.isNotEmpty) {
+            tabs.add(
+              TabInfo(href: href, ariaControls: ariaControls, name: name),
+            );
           }
         }
+
+        // Сохраняем в кэш
+        await _saveCachedTabs(tabs);
 
         return tabs;
       } else {
@@ -78,6 +96,49 @@ class MptParserService {
       }
     } catch (e) {
       throw Exception('Ошибка при парсинге списка вкладок: $e');
+    }
+  }
+
+  /// Получает кэшированные вкладки
+  Future<List<TabInfo>?> _getCachedTabs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = prefs.getInt(_cacheKeyTabsTimestamp);
+      final cachedJson = prefs.getString(_cacheKeyTabs);
+
+      if (timestamp != null && cachedJson != null) {
+        final cacheTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+        final age = DateTime.now().difference(cacheTime);
+        
+        if (age < _cacheTtl) {
+          // Кэш действителен, возвращаем данные
+          final List<dynamic> decoded = jsonDecode(cachedJson);
+          return decoded.map((json) => TabInfo(
+            href: json['href'] as String,
+            ariaControls: json['ariaControls'] as String,
+            name: json['name'] as String,
+          )).toList();
+        } else {
+          // Кэш истек, очищаем устаревшие данные
+          await prefs.remove(_cacheKeyTabs);
+          await prefs.remove(_cacheKeyTabsTimestamp);
+        }
+      }
+    } catch (e) {
+      // Игнорируем ошибки кэша
+    }
+    return null;
+  }
+
+  /// Сохраняет вкладки в кэш
+  Future<void> _saveCachedTabs(List<TabInfo> tabs) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = jsonEncode(tabs.map((tab) => tab.toJson()).toList());
+      await prefs.setString(_cacheKeyTabs, json);
+      await prefs.setInt(_cacheKeyTabsTimestamp, DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      // Игнорируем ошибки кэша
     }
   }
 
@@ -174,17 +235,21 @@ class MptParserService {
   ///
   /// Параметры:
   /// - [specialtyFilter]: Опциональный фильтр по коду специальности
+  /// - [forceRefresh]: Принудительное обновление без использования кэша
   ///
   /// Возвращает:
   /// - List<GroupInfo>: Список информации о группах
-  Future<List<GroupInfo>> parseGroups([String? specialtyFilter]) async {
+  Future<List<GroupInfo>> parseGroups([
+    String? specialtyFilter,
+    bool forceRefresh = false,
+  ]) async {
     // Если задан фильтр специальности, используем оптимизированный метод
     if (specialtyFilter != null) {
-      return _parseGroupsBySpecialty(specialtyFilter);
+      return _parseGroupsBySpecialty(specialtyFilter, forceRefresh: forceRefresh);
     }
 
     // Иначе используем метод для получения всех групп
-    return _parseAllGroups();
+    return _parseAllGroups(forceRefresh: forceRefresh);
   }
 
   /// Парсит все группы без фильтрации
@@ -194,8 +259,16 @@ class MptParserService {
   ///
   /// Возвращает:
   /// - List<GroupInfo>: Список информации о всех группах
-  Future<List<GroupInfo>> _parseAllGroups() async {
+  Future<List<GroupInfo>> _parseAllGroups({bool forceRefresh = false}) async {
     try {
+      // Проверяем кэш
+      if (!forceRefresh) {
+        final cachedGroups = await _getCachedGroups(null);
+        if (cachedGroups != null) {
+          return cachedGroups;
+        }
+      }
+
       // Отправляем HTTP-запрос к странице с расписанием
       final response = await http
           .get(Uri.parse(baseUrl))
@@ -216,36 +289,42 @@ class MptParserService {
         // Создаем список для хранения информации о группах
         final List<GroupInfo> groups = [];
 
-        // Ищем все заголовки и div элементы, которые могут содержать информацию о группах
-        final groupHeaders = document.querySelectorAll('h2, h3, h4, h5');
-        final groupDivs = document.querySelectorAll('div');
+        // Ищем все tabpanel элементы (более строгий селектор)
+        final tabPanels = document.querySelectorAll('[role="tabpanel"]');
 
-        // Проходим по всем заголовкам и ищем информацию о группах
-        for (var header in groupHeaders) {
-          final text = header.text.trim();
-          // Проверяем, начинается ли текст с "Группа "
-          if (text.startsWith('Группа ')) {
-            // Парсим информацию о группе из текста заголовка
-            final groupInfo = _parseGroupFromHeader(text, document);
-            groups.addAll(groupInfo);
+        // Проходим по всем tabpanel и ищем группы
+        for (var tabPanel in tabPanels) {
+          // Ищем заголовки групп только внутри tabpanel (строгий селектор h2, h3)
+          final groupHeaders = tabPanel.querySelectorAll('h2, h3');
+          
+          // Ищем заголовок h2 с информацией о специальности
+          String specialtyFromContext = '';
+          for (var h2 in tabPanel.querySelectorAll('h2')) {
+            final h2Text = h2.text.trim();
+            if (h2Text.startsWith('Расписание занятий для ')) {
+              specialtyFromContext = h2Text.substring(23).trim();
+              break;
+            }
           }
-        }
 
-        // Если не найдено групп в заголовках, проверяем div элементы
-        if (groups.isEmpty) {
-          for (var div in groupDivs) {
-            final text = div.text.trim();
-            // Проверяем, начинается ли текст с "Группа "
+          // Проходим по заголовкам и парсим информацию о группах
+          for (var header in groupHeaders) {
+            final text = header.text.trim();
+            // Проверяем, начинается ли текст строго с "Группа "
             if (text.startsWith('Группа ')) {
-              // Парсим информацию о группе из текста div элемента
-              final groupInfo = _parseGroupFromHeader(text, document);
-              if (groupInfo.isNotEmpty) {
-                groups.addAll(groupInfo);
-                break;
-              }
+              // Парсим информацию о группе из текста заголовка
+              final groupInfo = _parseGroupFromHeader(
+                text,
+                document,
+                specialtyFromContext.isNotEmpty ? specialtyFromContext : null,
+              );
+              groups.addAll(groupInfo);
             }
           }
         }
+
+        // Сохраняем в кэш
+        await _saveCachedGroups(null, groups);
 
         return groups;
       } else {
@@ -269,9 +348,18 @@ class MptParserService {
   /// Возвращает:
   /// - List<GroupInfo>: Список информации о группах для указанной специальности
   Future<List<GroupInfo>> _parseGroupsBySpecialty(
-    String specialtyFilter,
-  ) async {
+    String specialtyFilter, {
+    bool forceRefresh = false,
+  }) async {
     try {
+      // Проверяем кэш
+      if (!forceRefresh) {
+        final cachedGroups = await _getCachedGroups(specialtyFilter);
+        if (cachedGroups != null) {
+          return cachedGroups;
+        }
+      }
+
       // Отправляем HTTP-запрос к странице с расписанием
       final response = await http
           .get(Uri.parse(baseUrl))
@@ -289,27 +377,29 @@ class MptParserService {
         // Парсим HTML документ с помощью библиотеки html
         final document = parser.parse(response.body);
 
-        // Получаем список табов для поиска соответствия между specialtyFilter и ID
-        final tabs = await parseTabList();
+        // Получаем список табов для поиска соответствия между specialtyFilter и ID (используем кэш)
+        final tabs = await parseTabList(forceRefresh: forceRefresh);
 
-        // Ищем таб, который соответствует specialtyFilter
-        String targetId = '';
+        // Ищем таб, который соответствует specialtyFilter (оптимизированный поиск)
+        // Может быть передан как имя специальности, так и код (href)
+        String? targetId;
         for (var tab in tabs) {
-          // Проверяем совпадение по имени таба
+          // Проверяем точное совпадение по имени таба
           if (tab.name == specialtyFilter) {
             targetId = tab.ariaControls;
             break;
           }
-
-          // Также проверяем совпадение по href (для хешей)
-          if (tab.href == specialtyFilter) {
+          // Проверяем совпадение по href (код специальности)
+          if (tab.href == specialtyFilter || 
+              tab.href == '#$specialtyFilter' ||
+              tab.href.replaceAll('#', '').replaceAll('-', '.').toUpperCase() == specialtyFilter) {
             targetId = tab.ariaControls;
             break;
           }
         }
 
         // Если не нашли точное совпадение, пытаемся найти частичное совпадение
-        if (targetId.isEmpty) {
+        if (targetId == null) {
           for (var tab in tabs) {
             // Проверяем частичное совпадение по имени таба
             if (tab.name.contains(specialtyFilter) ||
@@ -317,30 +407,23 @@ class MptParserService {
               targetId = tab.ariaControls;
               break;
             }
-          }
-        }
-
-        // Если не нашли ID, возвращаем пустой список
-        if (targetId.isEmpty) {
-          return [];
-        }
-
-        // Ищем tabpanel с нужным ID
-        // Попробуем найти элемент несколькими способами
-        var tabPanel = document.querySelector('#$targetId');
-
-        // Если не нашли через querySelector, пробуем через поиск элементов с role="tabpanel"
-        if (tabPanel == null) {
-          // Ищем все элементы с role="tabpanel" и проверяем их ID
-          final allTabPanels = document.querySelectorAll('[role="tabpanel"]');
-          for (var panel in allTabPanels) {
-            final id = panel.attributes['id'];
-            if (id == targetId) {
-              tabPanel = panel;
+            // Проверяем частичное совпадение по href
+            final normalizedHref = tab.href.replaceAll('#', '').replaceAll('-', '.').toUpperCase();
+            if (normalizedHref.contains(specialtyFilter) ||
+                specialtyFilter.contains(normalizedHref)) {
+              targetId = tab.ariaControls;
               break;
             }
           }
         }
+
+        // Если не нашли ID, возвращаем пустой список
+        if (targetId == null || targetId.isEmpty) {
+          return [];
+        }
+
+        // Ищем tabpanel с нужным ID (строгий селектор)
+        final tabPanel = document.querySelector('[role="tabpanel"][id="$targetId"]');
 
         // Если не нашли tabpanel, возвращаем пустой список
         if (tabPanel == null) {
@@ -350,38 +433,36 @@ class MptParserService {
         // Создаем список для хранения информации о группах
         final List<GroupInfo> groups = [];
 
-        // Ищем заголовки групп только внутри нужного tabpanel
-        final groupHeaders = tabPanel.querySelectorAll('h2, h3, h4, h5');
-
-        // Ищем заголовок h2 с информацией о специальности
+        // Ищем заголовок h2 с информацией о специальности (строгий селектор)
         String specialtyFromContext = '';
-        final h2Headers = tabPanel.querySelectorAll('h2');
-        for (var h2 in h2Headers) {
-          final h2Text = h2.text.trim();
-          // Проверяем, начинается ли текст с "Расписание занятий для "
+        final h2Header = tabPanel.querySelector('h2');
+        if (h2Header != null) {
+          final h2Text = h2Header.text.trim();
           if (h2Text.startsWith('Расписание занятий для ')) {
-            // Извлекаем специальность из текста
-            specialtyFromContext = h2Text
-                .substring(23)
-                .trim(); // 23 = "Расписание занятий для ".length
-            break;
+            specialtyFromContext = h2Text.substring(23).trim();
           }
         }
 
-        // Проходим по всем заголовкам и парсим информацию о группах
+        // Ищем заголовки групп только внутри нужного tabpanel (строгий селектор h2, h3)
+        final groupHeaders = tabPanel.querySelectorAll('h2, h3');
+
+        // Проходим по заголовкам и парсим информацию о группах
         for (var header in groupHeaders) {
           final text = header.text.trim();
-          // Проверяем, начинается ли текст с "Группа "
+          // Проверяем, начинается ли текст строго с "Группа "
           if (text.startsWith('Группа ')) {
             // Парсим информацию о группе из текста заголовка
             final groupInfo = _parseGroupFromHeader(
               text,
               document,
-              specialtyFromContext,
+              specialtyFromContext.isNotEmpty ? specialtyFromContext : null,
             );
             groups.addAll(groupInfo);
           }
         }
+
+        // Сохраняем в кэш
+        await _saveCachedGroups(specialtyFilter, groups);
 
         return groups;
       } else {
@@ -484,34 +565,9 @@ class MptParserService {
           specialtyCode = prefixToSpecialtyCode[prefix]!;
           specialtyName = prefixToSpecialtyName[prefix] ?? prefix;
         } else {
-          // Если не удалось определить специальность по префиксу, ищем в документе
-          final specialtyListItems = document.querySelectorAll('ul li');
-          for (var item in specialtyListItems) {
-            final itemText = item.text.trim();
-            // Проверяем, содержит ли текст информацию о специальности
-            if (itemText.contains('.') &&
-                (itemText.contains('Э') ||
-                    itemText.contains('СА') ||
-                    itemText.contains('П,Т') ||
-                    itemText.contains('БАС') ||
-                    itemText.contains('БИ') ||
-                    itemText.contains('ИС') ||
-                    itemText.contains('ВД') ||
-                    itemText.contains('Ю') ||
-                    itemText.contains('ВТ') ||
-                    itemText.contains('БД'))) {
-              // Извлекаем код специальности из текста
-              final RegExp specialtyPattern = RegExp(
-                r'([0-9]{2}\.[0-9]{2}\.[0-9]{2}[\s\S]*)',
-              );
-              final match = specialtyPattern.firstMatch(itemText);
-              if (match != null) {
-                specialtyCode = match.group(1)?.trim() ?? '';
-                specialtyName = itemText;
-                break;
-              }
-            }
-          }
+          // Если не удалось определить специальность по префиксу, используем префикс как код
+          specialtyCode = prefix.isNotEmpty ? prefix : 'Неизвестная специальность';
+          specialtyName = prefix.isNotEmpty ? prefix : 'Неизвестная специальность';
         }
       }
 
@@ -528,5 +584,62 @@ class MptParserService {
     }
 
     return groups;
+  }
+
+  /// Получает кэшированные группы
+  Future<List<GroupInfo>?> _getCachedGroups(String? specialtyFilter) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = specialtyFilter != null
+          ? '$_cacheKeyGroups${specialtyFilter.hashCode}'
+          : '${_cacheKeyGroups}all';
+      final timestampKey = specialtyFilter != null
+          ? '$_cacheKeyGroupsTimestamp${specialtyFilter.hashCode}'
+          : '${_cacheKeyGroupsTimestamp}all';
+      
+      final timestamp = prefs.getInt(timestampKey);
+      final cachedJson = prefs.getString(cacheKey);
+
+      if (timestamp != null && cachedJson != null) {
+        final cacheTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+        final age = DateTime.now().difference(cacheTime);
+        
+        if (age < _cacheTtl) {
+          // Кэш действителен, возвращаем данные
+          final List<dynamic> decoded = jsonDecode(cachedJson);
+          return decoded.map((json) => GroupInfo(
+            code: json['code'] as String,
+            specialtyCode: json['specialtyCode'] as String,
+            specialtyName: json['specialtyName'] as String,
+          )).toList();
+        } else {
+          // Кэш истек, очищаем устаревшие данные
+          await prefs.remove(cacheKey);
+          await prefs.remove(timestampKey);
+        }
+      }
+    } catch (e) {
+      // Игнорируем ошибки кэша
+    }
+    return null;
+  }
+
+  /// Сохраняет группы в кэш
+  Future<void> _saveCachedGroups(String? specialtyFilter, List<GroupInfo> groups) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = specialtyFilter != null
+          ? '$_cacheKeyGroups${specialtyFilter.hashCode}'
+          : '${_cacheKeyGroups}all';
+      final timestampKey = specialtyFilter != null
+          ? '$_cacheKeyGroupsTimestamp${specialtyFilter.hashCode}'
+          : '${_cacheKeyGroupsTimestamp}all';
+      
+      final json = jsonEncode(groups.map((group) => group.toJson()).toList());
+      await prefs.setString(cacheKey, json);
+      await prefs.setInt(timestampKey, DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      // Игнорируем ошибки кэша
+    }
   }
 }

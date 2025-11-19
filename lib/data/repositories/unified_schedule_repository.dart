@@ -68,11 +68,11 @@ class UnifiedScheduleRepository {
     dataUpdatedNotifier.value = !dataUpdatedNotifier.value;
   }
 
-  /// Проверить, нужно ли обновить данные (обновляем каждые 5 минут)
+  /// Проверить, нужно ли обновить данные (обновляем каждые 24 часа)
   bool _shouldRefreshData() {
     if (_lastUpdate == null) return true;
     final now = DateTime.now();
-    return now.difference(_lastUpdate!).inMinutes > 5;
+    return now.difference(_lastUpdate!).inHours >= 24;
   }
 
   /// Обновить все данные из источника

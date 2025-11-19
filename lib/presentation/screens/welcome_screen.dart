@@ -5,6 +5,7 @@ import 'package:my_mpt/domain/usecases/get_specialties_usecase.dart';
 import 'package:my_mpt/domain/usecases/get_groups_by_specialty_usecase.dart';
 import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
 import 'package:my_mpt/data/repositories/mpt_repository.dart' as repo_impl;
+import 'package:my_mpt/data/services/preload_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Экран приветствия и настройки приложения
@@ -31,6 +32,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   /// Use case для получения списка групп по специальности
   late GetGroupsBySpecialtyUseCase _getGroupsBySpecialtyUseCase;
+
+  /// Сервис предзагрузки данных
+  final PreloadService _preloadService = PreloadService();
 
   /// Список специальностей
   List<Specialty> _specialties = [];
@@ -68,6 +72,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     _repository = repo_impl.MptRepository();
     _getSpecialtiesUseCase = GetSpecialtiesUseCase(_repository);
     _getGroupsBySpecialtyUseCase = GetGroupsBySpecialtyUseCase(_repository);
+    // Предзагружаем все данные при первом запуске
+    _preloadAllData();
+  }
+
+  /// Предзагружает все специальности и группы в фоновом режиме
+  Future<void> _preloadAllData() async {
+    // Запускаем предзагрузку в фоне, не блокируя UI
+    _preloadService.preloadAllData();
   }
 
   /// Загрузка списка специальностей

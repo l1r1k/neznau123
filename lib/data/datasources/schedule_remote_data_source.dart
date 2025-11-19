@@ -12,11 +12,11 @@ class ScheduleRemoteDataSource {
   /// Параметры:
   /// - [client]: HTTP-клиент для выполнения запросов (опционально)
   /// - [baseUrl]: Базовый URL для запросов (по умолчанию 'https://mpt.ru/raspisanie/')
-  /// - [cacheTtl]: Время жизни кэша (по умолчанию 5 минут)
+  /// - [cacheTtl]: Время жизни кэша (по умолчанию 24 часа)
   ScheduleRemoteDataSource({
     http.Client? client,
     this.baseUrl = 'https://mpt.ru/raspisanie/',
-    this.cacheTtl = const Duration(minutes: 5),
+    this.cacheTtl = const Duration(hours: 24),
   }) : _client = client ?? http.Client();
 
   /// HTTP-клиент для выполнения запросов
