@@ -5,6 +5,10 @@ import 'package:my_mpt/domain/usecases/get_specialties_usecase.dart';
 import 'package:my_mpt/domain/usecases/get_groups_by_specialty_usecase.dart';
 import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
 import 'package:my_mpt/data/repositories/mpt_repository.dart' as repo_impl;
+import 'package:my_mpt/data/repositories/unified_schedule_repository.dart';
+import 'package:my_mpt/presentation/widgets/success_notification.dart';
+import 'package:my_mpt/presentation/widgets/error_notification.dart';
+import 'package:my_mpt/presentation/widgets/info_notification.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -31,7 +35,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Group? _selectedGroup;
   String? _selectedSpecialtyCode;
   bool _isLoading = false;
+  bool _isRefreshing = false;
   StateSetter? _modalStateSetter;
+  DateTime? _lastUpdate;
 
   static const String _selectedGroupKey = 'selected_group';
   static const String _selectedSpecialtyKey = 'selected_specialty';
@@ -62,9 +68,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isLoading = false;
       });
       // Handle error appropriately
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка загрузки специальностей')),
-      );
+      if (context.mounted) {
+        showErrorNotification(
+          context,
+          'Ошибка загрузки',
+          'Не удалось загрузить специальности',
+          Icons.error_outline,
+        );
+      }
     }
   }
 
@@ -76,11 +87,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final selectedSpecialtyName = prefs.getString(
         '${_selectedSpecialtyKey}_name',
       );
+      // Загружаем время последнего обновления
+      final lastUpdateMillis = prefs.getString('last_schedule_update');
+      if (lastUpdateMillis != null && lastUpdateMillis.isNotEmpty) {
+        try {
+          // Проверяем, является ли строка числом (новый формат)
+          if (RegExp(r'^\d+$').hasMatch(lastUpdateMillis)) {
+            _lastUpdate = DateTime.fromMillisecondsSinceEpoch(
+              int.parse(lastUpdateMillis),
+            );
+          } else {
+            // Старый формат - игнорируем
+          }
+        } catch (e) {}
+      }
 
       setState(() {
         if (selectedGroupCode != null && selectedGroupCode.isNotEmpty) {
-          // Здесь можно загрузить информацию о группе, если это необходимо
-          // Пока просто устанавливаем состояние
+          // Устанавливаем выбранную группу, она будет проверена в _loadGroups
           _selectedGroup = Group(code: selectedGroupCode, specialtyCode: '');
         }
 
@@ -103,68 +127,206 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _selectedSpecialty = selectedSpecialty;
             }
           }
+
+          // Загружаем группы для выбранной специальности
+          if (_selectedSpecialty != null &&
+              _selectedSpecialty!.code.isNotEmpty) {
+            // Добавляем небольшую задержку для корректной инициализации
+            Future.delayed(const Duration(milliseconds: 100), () {
+              _loadGroups(_selectedSpecialty!.code);
+            });
+          }
         }
       });
+    } catch (e) {}
+  }
+
+  /// Получает текст для отображения времени последнего обновления
+  String _getLastUpdateText() {
+    if (_lastUpdate == null) {
+      return 'Расписание еще не обновлялось';
+    }
+
+    final now = DateTime.now();
+    final difference = now.difference(_lastUpdate!);
+
+    if (difference.inDays > 0) {
+      return 'Последнее обновление: ${_lastUpdate!.day}.${_lastUpdate!.month.toString().padLeft(2, '0')} в ${_lastUpdate!.hour.toString().padLeft(2, '0')}:${_lastUpdate!.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inHours > 0) {
+      return 'Последнее обновление: ${difference.inHours} ${_getHoursText(difference.inHours)} назад';
+    } else if (difference.inMinutes > 0) {
+      return 'Последнее обновление: ${difference.inMinutes} ${_getMinutesText(difference.inMinutes)} назад';
+    } else {
+      return 'Последнее обновление: только что';
+    }
+  }
+
+  /// Возвращает правильное склонение слова "час" в зависимости от числа
+  String _getHoursText(int hours) {
+    if (hours % 10 == 1 && hours % 100 != 11) {
+      return 'час';
+    } else if (hours % 10 >= 2 &&
+        hours % 10 <= 4 &&
+        (hours % 100 < 10 || hours % 100 >= 20)) {
+      return 'часа';
+    } else {
+      return 'часов';
+    }
+  }
+
+  /// Возвращает правильное склонение слова "минута" в зависимости от числа
+  String _getMinutesText(int minutes) {
+    if (minutes % 10 == 1 && minutes % 100 != 11) {
+      return 'минуту';
+    } else if (minutes % 10 >= 2 &&
+        minutes % 10 <= 4 &&
+        (minutes % 100 < 10 || minutes % 100 >= 20)) {
+      return 'минуты';
+    } else {
+      return 'минут';
+    }
+  }
+
+  /// Обновляет расписание
+  Future<void> _refreshSchedule() async {
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    try {
+      // Проверяем, выбрана ли группа
+      final prefs = await SharedPreferences.getInstance();
+      final selectedGroupCode = prefs.getString(_selectedGroupKey);
+
+      if (selectedGroupCode == null || selectedGroupCode.isEmpty) {
+        if (context.mounted) {
+          showInfoNotification(
+            context,
+            'Выберите группу',
+            'Сначала выберите специальность и группу',
+            Icons.info_outline,
+          );
+        }
+        setState(() {
+          _isRefreshing = false;
+        });
+        return;
+      }
+
+      // Обновляем расписание через unified repository
+      final repository = UnifiedScheduleRepository();
+      await repository.forceRefresh();
+
+      // Сохраняем время обновления
+      final now = DateTime.now();
+      await prefs.setString(
+        'last_schedule_update',
+        now.millisecondsSinceEpoch.toString(),
+      );
+
+      setState(() {
+        _lastUpdate = now;
+        _isRefreshing = false;
+      });
+
+      if (context.mounted) {
+        showSuccessNotification(
+          context,
+          'Расписание обновлено',
+          'Данные успешно загружены',
+          Icons.check_circle_outline,
+        );
+      }
     } catch (e) {
-      print('DEBUG: Ошибка загрузки выбранных настроек: $e');
+      setState(() {
+        _isRefreshing = false;
+      });
+
+      if (context.mounted) {
+        showErrorNotification(
+          context,
+          'Ошибка обновления',
+          'Не удалось обновить расписание',
+          Icons.error_outline,
+        );
+      }
     }
   }
 
   Future<void> _loadGroups(String specialtyCode) async {
-    print('DEBUG: Начинаем загрузку групп для специальности: $specialtyCode');
-    print('DEBUG: Длина кода специальности: ${specialtyCode.length}');
-    print('DEBUG: Код специальности в байтах: ${specialtyCode.codeUnits}');
-    print('DEBUG: Начинается с #: ${specialtyCode.startsWith('#')}');
-    print('DEBUG: Тип кода специальности: ${specialtyCode.runtimeType}');
     setState(() {
       _isLoading = true;
       _groups = [];
-      _selectedGroup = null;
+      // Не сбрасываем _selectedGroup здесь, чтобы сохранить выбранную группу
     });
 
     try {
-      final groups = await _getGroupsBySpecialtyUseCase(specialtyCode);
-      print('DEBUG: Получено групп: ${groups.length}');
+      // Добавляем таймаут для предотвращения бесконечной загрузки
+      final groups = await _getGroupsBySpecialtyUseCase(specialtyCode).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Превышено время ожидания загрузки групп');
+        },
+      );
+
+      // Загружаем выбранную группу, если она была сохранена
+      Group? selectedGroup;
+      if (_selectedGroup != null) {
+        // Проверяем, существует ли выбранная группа в новом списке
+        selectedGroup = groups.firstWhere(
+          (group) => group.code == _selectedGroup!.code,
+          orElse: () => Group(code: '', specialtyCode: ''),
+        );
+
+        // Если группа не найдена, сбрасываем выбор
+        if (selectedGroup.code.isEmpty) {
+          selectedGroup = null;
+        }
+      } else {
+        // Проверяем, есть ли сохраненная группа в настройках
+        final prefs = await SharedPreferences.getInstance();
+        final savedGroupCode = prefs.getString(_selectedGroupKey);
+        if (savedGroupCode != null && savedGroupCode.isNotEmpty) {
+          selectedGroup = groups.firstWhere(
+            (group) => group.code == savedGroupCode,
+            orElse: () => Group(code: '', specialtyCode: ''),
+          );
+
+          // Если группа не найдена, сбрасываем выбор
+          if (selectedGroup.code.isEmpty) {
+            selectedGroup = null;
+          }
+        }
+      }
+
       setState(() {
         _groups = groups;
         _isLoading = false;
+        // Обновляем выбранную группу только если она существует в новом списке
+        if (selectedGroup != null) {
+          _selectedGroup = selectedGroup;
+        }
       });
-
-      // Обновляем состояние модального окна, если оно открыто
-      _modalStateSetter?.call(() {});
-
-      // Show message if no groups found
-      if (groups.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Для выбранной специальности группы не найдены'),
-          ),
-        );
-      } else {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Загружено ${groups.length} групп')),
-        );
-      }
 
       // Force refresh the UI
       setState(() {});
     } catch (e) {
-      print('DEBUG: Ошибка загрузки групп: $e');
       setState(() {
         _isLoading = false;
       });
       // Handle error appropriately
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Ошибка загрузки групп: $e')));
+      if (context.mounted) {
+        showErrorNotification(
+          context,
+          'Ошибка загрузки',
+          'Не удалось загрузить группы. Попробуйте еще раз.',
+          Icons.error_outline,
+        );
+      }
     }
   }
 
   void _onSpecialtySelected(Specialty specialty) async {
-    print(
-      'DEBUG: Выбрана специальность: ${specialty.code} - ${specialty.name}',
-    );
     setState(() {
       _selectedSpecialty = specialty;
       _selectedSpecialtyCode = specialty.code; // Also store the code
@@ -177,9 +339,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await prefs.setString(_selectedSpecialtyKey, specialty.code);
       // Also save the specialty name for immediate display
       await prefs.setString('${_selectedSpecialtyKey}_name', specialty.name);
-    } catch (e) {
-      print('DEBUG: Ошибка сохранения выбранной специальности: $e');
-    }
+    } catch (e) {}
 
     _loadGroups(specialty.code);
   }
@@ -193,14 +353,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_selectedGroupKey, group.code);
-    } catch (e) {
-      print('DEBUG: Ошибка сохранения выбранной группы: $e');
-    }
+    } catch (e) {}
 
-    // Show confirmation
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Выбрана группа: ${group.code}')));
+    // Принудительно обновляем расписание
+    try {
+      final repository = UnifiedScheduleRepository();
+      await repository.forceRefresh();
+
+      // Show confirmation
+      if (context.mounted) {
+        showSuccessNotification(
+          context,
+          'Группа выбрана',
+          '${group.code} • Расписание обновлено',
+          Icons.check_circle_outline,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showErrorNotification(
+          context,
+          'Группа выбрана',
+          '${group.code} • Ошибка обновления расписания',
+          Icons.warning_amber_rounded,
+        );
+      }
+    }
   }
 
   @override
@@ -236,8 +414,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 14),
               _SettingsCard(
                 title: 'Обновить расписание',
-                subtitle: 'Последнее обновление: сегодня в 08:30',
+                subtitle: _getLastUpdateText(),
                 icon: Icons.refresh,
+                onTap: _refreshSchedule,
+                isRefreshing: _isRefreshing,
               ),
               const SizedBox(height: 28),
               const _Section(title: 'Обратная связь'),
@@ -259,7 +439,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: const ListTile(
-                    leading: Icon(Icons.info_outline, color: Color(0xFFFF8C00)),
+                    leading: Icon(Icons.info_outline, color: Colors.white),
                     title: Text(
                       'О приложении',
                       style: TextStyle(
@@ -292,18 +472,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'О приложении',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
-          content: const Text(
-            'Приложение создано студентами группы П50-1-22',
-            style: TextStyle(color: Colors.white70),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Мой МПТ - Мобильное приложение для студентов Московского приборостроительного техникума, позволяющее просматривать расписание занятий, звонки и другую полезную информацию.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Разработчики:',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Студенты группы П50-1-22:',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '• Себежко Александр Андреевич',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '• Симернин Матвей Александрович',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Версия: 0.1.0',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
               },
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
               child: const Text(
                 'Закрыть',
-                style: TextStyle(color: Color(0xFFFF8C00)),
+                style: TextStyle(color: Colors.white),
               ),
             ),
           ],
@@ -318,8 +541,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!await launchUrl(supportUri)) {
       // Показываем сообщение об ошибке, если не удалось открыть ссылку
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть ссылку поддержки')),
+        showErrorNotification(
+          context,
+          'Ошибка',
+          'Не удалось открыть ссылку поддержки',
+          Icons.error_outline,
         );
       }
     }
@@ -343,7 +569,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 4,
                 width: 40,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -360,9 +586,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Expanded(
                 child: _isLoading
                     ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFFFF8C00),
-                        ),
+                        child: CircularProgressIndicator(color: Colors.white),
                       )
                     : ListView.builder(
                         itemCount: _specialties.length,
@@ -412,7 +636,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     height: 4,
                     width: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -430,7 +654,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: _isLoading
                         ? const Center(
                             child: CircularProgressIndicator(
-                              color: Color(0xFFFF8C00),
+                              color: Colors.white,
                             ),
                           )
                         : _groups.isEmpty
@@ -524,23 +748,63 @@ class _Section extends StatelessWidget {
   }
 }
 
-class _SettingsCard extends StatelessWidget {
+class _SettingsCard extends StatefulWidget {
   final String title;
   final String subtitle;
   final IconData icon;
   final VoidCallback? onTap;
+  final bool isRefreshing;
 
   const _SettingsCard({
     required this.title,
     required this.subtitle,
     required this.icon,
     this.onTap,
+    this.isRefreshing = false,
   });
+
+  @override
+  State<_SettingsCard> createState() => _SettingsCardState();
+}
+
+class _SettingsCardState extends State<_SettingsCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _rotationAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    );
+    _rotationAnimation = Tween<double>(
+      begin: 0,
+      end: 360,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.linear));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SettingsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isRefreshing && !oldWidget.isRefreshing) {
+      _controller.repeat();
+    } else if (!widget.isRefreshing && oldWidget.isRefreshing) {
+      _controller.stop();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         decoration: BoxDecoration(
@@ -553,10 +817,15 @@ class _SettingsCard extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: const Color(0xFFFF8C00).withOpacity(0.1),
+                color: const Color(0xFFFFFFFF).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, color: const Color(0xFFFF8C00)),
+              child: widget.isRefreshing
+                  ? RotationTransition(
+                      turns: _rotationAnimation,
+                      child: Icon(widget.icon, color: Colors.white),
+                    )
+                  : Icon(widget.icon, color: Colors.white),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -564,7 +833,7 @@ class _SettingsCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    widget.title,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -573,17 +842,26 @@ class _SettingsCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    subtitle,
+                    widget.subtitle,
                     style: const TextStyle(fontSize: 13, color: Colors.white70),
                   ),
                 ],
               ),
             ),
-            Icon(
-              onTap != null ? Icons.arrow_forward_ios : null,
-              size: 16,
-              color: Colors.white54,
-            ),
+            widget.isRefreshing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Icon(
+                    widget.onTap != null ? Icons.arrow_forward_ios : null,
+                    size: 16,
+                    color: Colors.white54,
+                  ),
           ],
         ),
       ),

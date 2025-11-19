@@ -9,5 +9,5 @@ abstract class ScheduleRepositoryInterface {
   Future<List<Schedule>> getTodaySchedule();
 
   /// Получить расписание на завтра
-  Future<List<Schedule>> getTomorrowSchedule();
+  Future<List<Schedule>> getTomorrowSchedule(); 
 }

@@ -4,19 +4,20 @@ import 'package:my_mpt/domain/entities/schedule.dart';
 import 'package:my_mpt/domain/entities/schedule_change.dart';
 import 'package:my_mpt/domain/usecases/get_weekly_schedule_usecase.dart';
 import 'package:my_mpt/domain/usecases/get_schedule_changes_usecase.dart';
-import 'package:my_mpt/domain/repositories/schedule_repository_interface.dart';
-import 'package:my_mpt/data/repositories/schedule_repository.dart';
+import 'package:my_mpt/data/repositories/unified_schedule_repository.dart';
 import 'package:my_mpt/data/repositories/schedule_changes_repository.dart';
 import 'package:my_mpt/presentation/widgets/building_chip.dart';
 import 'package:my_mpt/presentation/widgets/lesson_card.dart';
 import 'package:my_mpt/presentation/widgets/break_indicator.dart';
 import 'package:my_mpt/presentation/widgets/numerator_denominator_card.dart';
-import 'package:my_mpt/presentation/widgets/schedule_change_card.dart';
 import 'package:my_mpt/data/services/calls_service.dart';
 import 'package:my_mpt/data/repositories/week_repository.dart';
 import 'package:my_mpt/data/models/week_info.dart';
 
 /// Экран "Расписание" — тёмный минималистичный лонг-лист
+///
+/// Этот экран отображает недельное расписание занятий с поддержкой
+/// отображения изменений в расписании и различий между числителем и знаменателем
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
 
@@ -24,60 +25,123 @@ class ScheduleScreen extends StatefulWidget {
   State<ScheduleScreen> createState() => _ScheduleScreenState();
 }
 
+/// Состояние экрана расписания
 class _ScheduleScreenState extends State<ScheduleScreen> {
+  /// Цвет фона экрана
   static const _backgroundColor = Color(0xFF000000);
+
+  /// Цвет границ элементов
   static const _borderColor = Color(0xFF333333);
 
-  late ScheduleRepositoryInterface _repository;
-  late ScheduleChangesRepository _changesRepository;
-  late GetWeeklyScheduleUseCase _getWeeklyScheduleUseCase;
-  late GetScheduleChangesUseCase _getScheduleChangesUseCase;
-  late WeekRepository _weekRepository;
-  Map<String, List<Schedule>> _weeklySchedule = {};
-  List<ScheduleChangeEntity> _scheduleChanges = [];
-  WeekInfo? _weekInfo;
-  bool _isLoading = true;
+  /// Репозиторий для работы с расписанием
+  late UnifiedScheduleRepository _repository;
 
-  static const Color _lessonAccent = Color(0xFFFF8C00);
+  /// Репозиторий для работы с изменениями в расписании
+  late ScheduleChangesRepository _changesRepository;
+
+  /// Use case для получения недельного расписания
+  late GetWeeklyScheduleUseCase _getWeeklyScheduleUseCase;
+
+  /// Use case для получения изменений в расписании
+  late GetScheduleChangesUseCase _getScheduleChangesUseCase;
+
+  /// Репозиторий для работы с информацией о неделе
+  late WeekRepository _weekRepository;
+
+  /// Недельное расписание
+  Map<String, List<Schedule>> _weeklySchedule = {};
+
+  /// Изменения в расписании
+  List<ScheduleChangeEntity> _scheduleChanges = [];
+
+  /// Информация о текущей неделе
+  WeekInfo? _weekInfo;
+
+  /// Флаг загрузки данных
+  bool _isLoading = false;
+
+  /// Акцентный цвет для элементов расписания
+  static const Color _lessonAccent = Colors.grey;
 
   @override
   void initState() {
     super.initState();
-    _repository = ScheduleRepository();
+    _repository = UnifiedScheduleRepository();
     _changesRepository = ScheduleChangesRepository();
     _weekRepository = WeekRepository();
     _getWeeklyScheduleUseCase = GetWeeklyScheduleUseCase(_repository);
     _getScheduleChangesUseCase = GetScheduleChangesUseCase(_changesRepository);
-    _loadScheduleData();
+
+    // Слушаем уведомления об обновлении данных
+    _repository.dataUpdatedNotifier.addListener(_onDataUpdated);
+
+    _initializeSchedule();
   }
 
-  Future<void> _loadScheduleData() async {
-    setState(() {
-      _isLoading = true;
-    });
+  /// Инициализация расписания
+  Future<void> _initializeSchedule() async {
+    await _loadScheduleData(forceRefresh: false, showLoader: false);
+    _loadScheduleData(forceRefresh: true, showLoader: false);
+  }
+
+  /// Обработчик уведомлений об обновлении данных
+  void _onDataUpdated() {
+    _loadScheduleData(forceRefresh: false, showLoader: false);
+  }
+
+  /// Загрузка данных расписания
+  ///
+  /// Параметры:
+  /// - [forceRefresh]: Принудительное обновление данных
+  /// - [showLoader]: Показывать индикатор загрузки
+  Future<void> _loadScheduleData({
+    required bool forceRefresh,
+    bool showLoader = true,
+  }) async {
+    if (showLoader) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
-      // Load week information
-      final weekInfo = await _weekRepository.getWeekInfo();
-      
-      final scheduleData = await _getWeeklyScheduleUseCase();
-      
-      // Load schedule changes
-      final scheduleChanges = await _getScheduleChangesUseCase();
-      
+      final weeklySchedule = await _getWeeklyScheduleUseCase(
+        forceRefresh: forceRefresh,
+      );
+      if (!mounted) return;
       setState(() {
-        _weekInfo = weekInfo;
-        _weeklySchedule = scheduleData;
-        _scheduleChanges = scheduleChanges;
-        _isLoading = false;
+        _weeklySchedule = weeklySchedule;
+        if (showLoader) {
+          _isLoading = false;
+        }
       });
     } catch (e) {
+      if (showLoader) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка загрузки расписания')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final results = await Future.wait([
+        _weekRepository.getWeekInfo(),
+        _getScheduleChangesUseCase(),
+      ]);
+
+      if (!mounted) return;
       setState(() {
-        _isLoading = false;
+        _weekInfo = results[0] as WeekInfo;
+        _scheduleChanges = results[1] as List<ScheduleChangeEntity>;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка загрузки расписания')),
-      );
+    } catch (_) {
+      // Если не удалось получить доп. данные, просто оставляем старые
     }
   }
 
@@ -85,15 +149,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     final days = _weeklySchedule.entries.toList();
 
+    final isInitialLoading = _isLoading && _weeklySchedule.isEmpty;
+
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: SafeArea(
-        child: _isLoading
+        child: isInitialLoading
             ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFFF8C00)),
+                child: CircularProgressIndicator(color: Colors.white),
               )
             : RefreshIndicator(
-                onRefresh: _loadScheduleData,
+                onRefresh: () => _loadScheduleData(forceRefresh: true),
+                color: Colors.white,
                 child: CustomScrollView(
                   slivers: [
                     SliverToBoxAdapter(
@@ -126,6 +193,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
+  /// Определяет основной корпус по количеству занятий
+  ///
+  /// Параметры:
+  /// - [schedule]: Список занятий для анализа
+  ///
+  /// Возвращает:
+  /// - String: Название основного корпуса
   String _primaryBuilding(List<Schedule> schedule) {
     if (schedule.isEmpty) return '';
     final counts = <String, int>{};
@@ -144,19 +218,58 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return primary;
   }
 
+  @override
+  void dispose() {
+    // Удаляем слушателя уведомлений
+    _repository.dataUpdatedNotifier.removeListener(_onDataUpdated);
+    super.dispose();
+  }
+
+  /// Форматирует дату для отображения
+  ///
+  /// Параметры:
+  /// - [date]: Дата для форматирования
+  ///
+  /// Возвращает:
+  /// - String: Отформатированная дата
   String _formatDate(DateTime date) {
     return DateFormatter.formatDayWithMonth(date);
   }
 }
 
+/// Виджет заголовка экрана расписания
 class _Header extends StatelessWidget {
+  /// Цвет границы заголовка
   final Color borderColor;
+
+  /// Текст даты
   final String dateLabel;
+
+  /// Тип недели (числитель/знаменатель)
   final String weekType;
 
-  static const List<Color> _gradient = [Color(0xFF333333), Color(0xFF111111)];
+  const _Header({
+    required this.borderColor,
+    required this.dateLabel,
+    required this.weekType,
+  });
 
-  const _Header({required this.borderColor, required this.dateLabel, required this.weekType});
+  /// Получает градиент заголовка в зависимости от типа недели
+  ///
+  /// Параметры:
+  /// - [weekType]: Тип недели (Числитель/Знаменатель)
+  ///
+  /// Возвращает:
+  /// - List<Color>: Градиент для заголовка
+  List<Color> _getHeaderGradient(String weekType) {
+    if (weekType == 'Знаменатель') {
+      return const [Color(0xFF111111), Color(0xFF4FC3F7)];
+    } else if (weekType == 'Знаменатель') {
+      return const [Color(0xFF111111), Color(0xFFFF8C00)];
+    } else {
+      return const [Color(0xFF111111), Color(0xFF333333)];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,8 +277,8 @@ class _Header extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        gradient: const LinearGradient(
-          colors: _gradient,
+        gradient: LinearGradient(
+          colors: _getHeaderGradient(weekType),
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -221,11 +334,21 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// Виджет секции дня недели
 class _DaySection extends StatelessWidget {
+  /// Название дня недели
   final String title;
+
+  /// Корпус проведения занятий
   final String building;
+
+  /// Список занятий в этот день
   final List<Schedule> lessons;
+
+  /// Акцентный цвет
   final Color accentColor;
+
+  /// Тип недели (числитель/знаменатель)
   final String? weekType;
 
   const _DaySection({
@@ -237,6 +360,12 @@ class _DaySection extends StatelessWidget {
   });
 
   /// Преобразует день недели из ЗАГЛАВНЫХ букв в формат с заглавной буквы
+  ///
+  /// Параметры:
+  /// - [day]: День недели в ЗАГЛАВНЫХ буквах
+  ///
+  /// Возвращает:
+  /// - String: День недели с заглавной буквы
   String _formatDayTitle(String day) {
     if (day.isEmpty) return day;
 
@@ -254,95 +383,48 @@ class _DaySection extends StatelessWidget {
     return dayMap[day] ?? day;
   }
 
-  /// Фильтрует пары в зависимости от типа недели
-  List<Schedule> _filterScheduleByWeekType(List<Schedule> schedule, String? weekType) {
-    // Если информация о неделе недоступна, возвращаем все пары
-    if (weekType == null) {
-      return schedule;
-    }
-
-    // Группируем пары по номеру
-    final Map<String, List<Schedule>> lessonsByPeriod = {};
-    for (final lesson in schedule) {
-      final period = lesson.number;
-      if (!lessonsByPeriod.containsKey(period)) {
-        lessonsByPeriod[period] = [];
-      }
-      lessonsByPeriod[period]!.add(lesson);
-    }
-
-    // Фильтруем пары
-    final List<Schedule> filteredSchedule = [];
-    
-    lessonsByPeriod.forEach((period, lessons) {
-      // Проверяем, есть ли пары с типом (числитель/знаменатель)
-      // Фильтруем пустые уроки - у которых subject или teacher пустые
-      final numeratorLessons = lessons
-          .where((lesson) => lesson.lessonType == 'numerator' && 
-                 lesson.subject.trim().isNotEmpty && 
-                 lesson.teacher.trim().isNotEmpty)
-          .toList();
-      final denominatorLessons = lessons
-          .where((lesson) => lesson.lessonType == 'denominator' && 
-                 lesson.subject.trim().isNotEmpty && 
-                 lesson.teacher.trim().isNotEmpty)
-          .toList();
-      final regularLessons = lessons
-          .where((lesson) => lesson.lessonType == null && 
-                 lesson.subject.trim().isNotEmpty && 
-                 lesson.teacher.trim().isNotEmpty)
-          .toList();
-      
-      if (numeratorLessons.isNotEmpty || denominatorLessons.isNotEmpty) {
-        // Если есть пары с типом, выбираем только те, которые соответствуют текущей неделе
-        if (weekType == 'Числитель' && numeratorLessons.isNotEmpty) {
-          filteredSchedule.addAll(numeratorLessons);
-        } else if (weekType == 'Знаменатель' && denominatorLessons.isNotEmpty) {
-          filteredSchedule.addAll(denominatorLessons);
-        }
-        // Если для текущей недели нет пары, не добавляем ничего (остается пустой слот)
-      } else {
-        // Если нет пар с типом, добавляем все обычные пары
-        filteredSchedule.addAll(regularLessons);
-      }
-    });
-    
-    return filteredSchedule;
-  }
-
   /// Создает виджеты для отображения уроков с поддержкой числителя/знаменателя
-  List<Widget> _buildLessonWidgets(List<Schedule> lessons, List<dynamic> callsData) {
-    // Фильтруем уроки в зависимости от типа недели
-    final filteredLessons = _filterScheduleByWeekType(lessons, weekType);
-    
+  ///
+  /// Параметры:
+  /// - [lessons]: Список занятий
+  /// - [callsData]: Данные о звонках
+  ///
+  /// Возвращает:
+  /// - List<Widget>: Список виджетов занятий
+  List<Widget> _buildLessonWidgets(
+    List<Schedule> lessons,
+    List<dynamic> callsData,
+  ) {
     final widgets = <Widget>[];
-    
+
     // Группируем уроки по номеру пары
     final Map<String, List<Schedule>> lessonsByPeriod = {};
-    for (final lesson in filteredLessons) {
+    for (final lesson in lessons) {
       final period = lesson.number;
       if (!lessonsByPeriod.containsKey(period)) {
         lessonsByPeriod[period] = [];
       }
       lessonsByPeriod[period]!.add(lesson);
     }
-    
+
     // Сортируем номера пар
     final sortedPeriods = lessonsByPeriod.keys.toList()
       ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
-    
+
     // Создаем виджеты для каждой пары
     for (int i = 0; i < sortedPeriods.length; i++) {
       final period = sortedPeriods[i];
       final periodLessons = lessonsByPeriod[period]!;
-      
+
       // Определяем время пары
       String startTime = '';
       String endTime = '';
-      
+
       try {
         final periodInt = int.tryParse(period);
-        if (periodInt != null && periodInt > 0 && periodInt <= callsData.length) {
+        if (periodInt != null &&
+            periodInt > 0 &&
+            periodInt <= callsData.length) {
           final call = callsData[periodInt - 1];
           startTime = call.startTime;
           endTime = call.endTime;
@@ -350,15 +432,18 @@ class _DaySection extends StatelessWidget {
       } catch (e) {
         // Игнорируем ошибки
       }
-      
+
       // Проверяем, есть ли уроки с типом (числитель/знаменатель)
-      bool hasTypedLessons = periodLessons.any((lesson) => lesson.lessonType != null);
-      
+      bool hasTypedLessons = periodLessons.any(
+        (lesson) => lesson.lessonType != null,
+      );
+
       if (hasTypedLessons) {
         // Обрабатываем пары с числителем/знаменателем
+        // В недельном расписании показываем обе пары, независимо от типа недели
         Schedule? numeratorLesson;
         Schedule? denominatorLesson;
-        
+
         for (final lesson in periodLessons) {
           if (lesson.lessonType == 'numerator') {
             numeratorLesson = lesson;
@@ -366,7 +451,7 @@ class _DaySection extends StatelessWidget {
             denominatorLesson = lesson;
           }
         }
-        
+
         widgets.add(
           NumeratorDenominatorCard(
             numeratorLesson: numeratorLesson,
@@ -390,42 +475,41 @@ class _DaySection extends StatelessWidget {
               accentColor: accentColor,
             ),
           );
-          
+
           // Для обычных пар добавляем разделитель между уроками в одной паре
           if (j < periodLessons.length - 1) {
             widgets.add(const SizedBox(height: 8));
           }
         }
       }
-      
+
       // Добавляем разделитель между парами, кроме последней
       if (i < sortedPeriods.length - 1) {
         String nextLessonStartTime = '';
-        
+
         try {
           final nextPeriodInt = int.tryParse(sortedPeriods[i + 1]);
-          if (nextPeriodInt != null && nextPeriodInt > 0 && nextPeriodInt <= callsData.length) {
+          if (nextPeriodInt != null &&
+              nextPeriodInt > 0 &&
+              nextPeriodInt <= callsData.length) {
             final nextCall = callsData[nextPeriodInt - 1];
             nextLessonStartTime = nextCall.startTime;
           }
         } catch (e) {
           // Игнорируем ошибки
         }
-        
+
         widgets.add(
-          BreakIndicator(
-            startTime: endTime,
-            endTime: nextLessonStartTime,
-          ),
+          BreakIndicator(startTime: endTime, endTime: nextLessonStartTime),
         );
       }
-      
+
       // Добавляем отступ между парами
       if (i < sortedPeriods.length - 1) {
         widgets.add(const SizedBox(height: 14));
       }
     }
-    
+
     return widgets;
   }
 
@@ -453,21 +537,17 @@ class _DaySection extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (building.isNotEmpty) ...[
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: BuildingChip(label: building),
-                  ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: BuildingChip(label: building),
                 ),
-              ],
+              ),
             ],
           ),
           const SizedBox(height: 20),
-          Column(
-            children: _buildLessonWidgets(lessons, callsData),
-          ),
+          Column(children: _buildLessonWidgets(lessons, callsData)),
           const SizedBox(height: 12),
           Divider(color: Colors.white.withOpacity(0.05), height: 32),
         ],

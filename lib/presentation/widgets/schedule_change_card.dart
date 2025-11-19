@@ -1,26 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:my_mpt/core/utils/lesson_details_parser.dart';
+import 'package:my_mpt/data/services/calls_service.dart';
 
+/// Виджет карточки изменения в расписании
+///
+/// Этот виджет отображает информацию об изменениях в расписании,
+/// таких как замены предметов или дополнительные занятия
 class ScheduleChangeCard extends StatelessWidget {
+  /// Номер пары, к которой применяется изменение
   final String lessonNumber;
+
+  /// Исходный предмет (до изменения)
   final String replaceFrom;
+
+  /// Новый предмет (после изменения)
   final String replaceTo;
-  final String updatedAt;
-  final String changeDate;
 
   const ScheduleChangeCard({
     super.key,
     required this.lessonNumber,
     required this.replaceFrom,
     required this.replaceTo,
-    required this.updatedAt,
-    required this.changeDate,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Проверяем, является ли это дополнительным занятием (нет оригинального предмета)
-    final isAdditionalClass = replaceFrom.isEmpty || replaceFrom == '\u00A0'; // \u00A0 is &nbsp; in HTML
-    
+    final sanitizedReplaceFrom = (replaceFrom == '\u00A0' ? '' : replaceFrom)
+        .trim();
+    final sanitizedReplaceTo = replaceTo.replaceAll('\u00A0', ' ').trim();
+    final LessonDetails newLessonDetails = parseLessonDetails(
+      sanitizedReplaceTo,
+    );
+    final LessonDetails previousLessonDetails = parseLessonDetails(
+      sanitizedReplaceFrom,
+    );
+    final bool hasPreviousLesson = previousLessonDetails.hasData;
+
+    final bool isAdditionalClass =
+        sanitizedReplaceFrom.isEmpty ||
+        sanitizedReplaceTo.toLowerCase().startsWith('дополнительное занятие');
+
+    final _LessonTimes lessonTimes = _lessonTimesForNumber(lessonNumber);
+    final Color accentColor = isAdditionalClass
+        ? const Color(0xFFFF8C00).withOpacity(0.5)
+        : const Color(0xFFFF8C00);
+
+    final String subjectText = newLessonDetails.subject.isNotEmpty
+        ? newLessonDetails.subject
+        : (isAdditionalClass
+              ? 'Дополнительное занятие'
+              : 'Замена в расписании');
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF111111),
@@ -40,44 +70,66 @@ class ScheduleChangeCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _NumberBadge(number: lessonNumber),
+                _NumberBadge(number: lessonNumber, accentColor: accentColor),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    isAdditionalClass ? 'Дополнительное занятие' : 'Замена в расписании',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.orange.withOpacity(0.8),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subjectText,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isAdditionalClass
+                              ? Colors.white.withOpacity(0.85)
+                              : Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (newLessonDetails.teacher.isNotEmpty)
+                        Text(
+                          newLessonDetails.teacher,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isAdditionalClass
+                                ? Colors.white.withOpacity(0.5)
+                                : Colors.white.withOpacity(0.7),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                Text(
-                  // Показываем дату применения изменений
-                  changeDate,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.7),
-                  ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      lessonTimes.start,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      lessonTimes.end,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // Показываем "Было:" только если это не дополнительное занятие
-            if (!isAdditionalClass) ...[
-              _ChangeRow(
-                label: 'Было:',
-                value: replaceFrom,
-                isReplacement: false,
-              ),
-              const SizedBox(height: 8),
+            if (hasPreviousLesson) ...[
+              const SizedBox(height: 12),
+              _PreviousLessonInfo(details: previousLessonDetails),
             ],
-            _ChangeRow(
-              label: isAdditionalClass ? '' : 'Стало:',
-              value: replaceTo,
-              isReplacement: true,
-            ),
           ],
         ),
       ),
@@ -85,10 +137,15 @@ class ScheduleChangeCard extends StatelessWidget {
   }
 }
 
+/// Виджет бейджа с номером пары
 class _NumberBadge extends StatelessWidget {
+  /// Номер пары
   final String number;
 
-  const _NumberBadge({required this.number});
+  /// Акцентный цвет бейджа
+  final Color accentColor;
+
+  const _NumberBadge({required this.number, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -96,11 +153,7 @@ class _NumberBadge extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF8C00), Color(0xFFFFA500)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xFF333333),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
@@ -117,48 +170,68 @@ class _NumberBadge extends StatelessWidget {
   }
 }
 
-class _ChangeRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool isReplacement;
+/// Блок с зачеркнутой оригинальной парой
+class _PreviousLessonInfo extends StatelessWidget {
+  final LessonDetails details;
 
-  const _ChangeRow({
-    required this.label,
-    required this.value,
-    required this.isReplacement,
-  });
+  const _PreviousLessonInfo({required this.details});
+
+  bool get _isAdditionalLesson =>
+      details.subject.trim().toLowerCase() == 'дополнительное занятие';
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Показываем метку только если она не пустая
-        if (label.isNotEmpty) ...[
-          SizedBox(
-            width: 50,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.white.withOpacity(0.7),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-        Expanded(
-          child: Text(
-            value,
+        if (details.subject.isNotEmpty)
+          Text(
+            details.subject,
             style: TextStyle(
               fontSize: 14,
-              fontWeight: isReplacement ? FontWeight.w600 : FontWeight.normal,
-              color: isReplacement ? Colors.orange : Colors.white,
+              color: Colors.white.withOpacity(0.5),
+              decoration: _isAdditionalLesson
+                  ? TextDecoration.none
+                  : TextDecoration.lineThrough,
             ),
           ),
-        ),
+        if (details.teacher.isNotEmpty) ...[
+          if (details.subject.isNotEmpty) const SizedBox(height: 2),
+          Text(
+            details.teacher,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withOpacity(0.4),
+              decoration: _isAdditionalLesson
+                  ? TextDecoration.none
+                  : TextDecoration.lineThrough,
+            ),
+          ),
+        ],
       ],
     );
   }
+}
+
+class _LessonTimes {
+  final String start;
+  final String end;
+
+  const _LessonTimes({required this.start, required this.end});
+}
+
+_LessonTimes _lessonTimesForNumber(String lessonNumber) {
+  final sanitizedNumber = lessonNumber.trim();
+  String start = '--:--';
+  String end = '--:--';
+
+  for (final call in CallsService.getCalls()) {
+    if (call.period == sanitizedNumber) {
+      start = call.startTime;
+      end = call.endTime;
+      break;
+    }
+  }
+
+  return _LessonTimes(start: start, end: end);
 }

@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:my_mpt/domain/entities/schedule.dart';
 
+/// Виджет карточки пары с числителем и знаменателем
+///
+/// Этот виджет отображает информацию о паре, которая может отличаться
+/// в зависимости от типа недели (числитель или знаменатель)
 class NumeratorDenominatorCard extends StatelessWidget {
+  /// Урок числителя (может быть null)
   final Schedule? numeratorLesson;
+
+  /// Урок знаменателя (может быть null)
   final Schedule? denominatorLesson;
+
+  /// Номер пары
   final String lessonNumber;
+
+  /// Время начала пары
   final String startTime;
+
+  /// Время окончания пары
   final String endTime;
 
   const NumeratorDenominatorCard({
@@ -33,96 +46,112 @@ class NumeratorDenominatorCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          // Левая часть - номер пары
-          Container(
-            width: 60,
-            height: 120,
-            child: Center(
-              child: _NumberBadge(number: lessonNumber),
-            ),
-          ),
-          
-          // Центральная часть - пары с разделителем
-          Expanded(
-            child: Container(
-              height: 120,
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Числитель
-                  if (numeratorLesson != null)
-                    _buildLessonItem(numeratorLesson!, true),
-                  
-                  // Разделитель
-                  Container(
-                    height: 1,
-                    color: const Color(0xFF333333),
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                  ),
-                  
-                  // Знаменатель
-                  if (denominatorLesson != null)
-                    _buildLessonItem(denominatorLesson!, false),
-                ],
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Левая часть - номер пары
+            Container(
+              width: 60,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: _NumberBadge(
+                  number: lessonNumber,
+                  showGradient:
+                      numeratorLesson == null || denominatorLesson == null,
+                ),
               ),
             ),
-          ),
-          
-          // Правая часть - время
-          Container(
-            width: 60,
-            height: 120,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    startTime,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+
+            // Центральная часть - пары с разделителем
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Числитель
+                    if (numeratorLesson != null)
+                      _buildLessonItem(numeratorLesson!, true)
+                    else
+                      _buildEmptyLessonItem(true),
+
+                    // Разделитель
+                    Container(
+                      height: 1,
+                      color: const Color(0xFF333333),
+                      margin: const EdgeInsets.symmetric(vertical: 4),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    endTime,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.7),
-                    ),
-                  ),
-                ],
+
+                    // Знаменатель
+                    if (denominatorLesson != null)
+                      _buildLessonItem(denominatorLesson!, false)
+                    else
+                      _buildEmptyLessonItem(false),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+
+            // Правая часть - время
+            Container(
+              width: 60,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      startTime,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      endTime,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
+  /// Создает виджет для отображения урока
+  ///
+  /// Параметры:
+  /// - [lesson]: Урок для отображения
+  /// - [isNumerator]: Флаг, указывающий является ли урок числителем
+  ///
+  /// Возвращает:
+  /// - Widget: Виджет урока
   Widget _buildLessonItem(Schedule lesson, bool isNumerator) {
-    final color = isNumerator 
+    final color = isNumerator
         ? const Color(0xFFFF8C00) // Оранжевый для числителя
         : const Color(0xFF4FC3F7); // Голубой для знаменателя;
-    
+
     return Expanded(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Индикатор типа (числитель/знаменатель)
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
-          
+
           // Основной контент
           Expanded(
             child: Column(
@@ -136,8 +165,6 @@ class NumeratorDenominatorCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -156,12 +183,65 @@ class NumeratorDenominatorCard extends StatelessWidget {
       ),
     );
   }
+
+  /// Создает виджет для отображения пустого урока
+  ///
+  /// Параметры:
+  /// - [isNumerator]: Флаг, указывающий является ли урок числителем
+  ///
+  /// Возвращает:
+  /// - Widget: Виджет пустого урока
+  Widget _buildEmptyLessonItem(bool isNumerator) {
+    final color = isNumerator
+        ? const Color(0xFFFF8C00) // Оранжевый для числителя
+        : const Color(0xFF4FC3F7); // Голубой для знаменателя;
+
+    return Expanded(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Индикатор типа (числитель/знаменатель)
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+
+          // Основной контент
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Нет пары',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white70,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
+/// Виджет бейджа с номером пары
 class _NumberBadge extends StatelessWidget {
+  /// Номер пары
   final String number;
 
-  const _NumberBadge({required this.number});
+  /// Показывать ли градиент
+  final bool showGradient;
+
+  const _NumberBadge({required this.number, this.showGradient = true});
 
   @override
   Widget build(BuildContext context) {
@@ -169,11 +249,14 @@ class _NumberBadge extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF8C00), Color(0xFFFF8C00)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: showGradient
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF333333), Color(0xFF111111)],
+              )
+            : null,
+        color: showGradient ? null : const Color(0xFF333333),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
