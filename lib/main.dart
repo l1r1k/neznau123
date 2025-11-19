@@ -4,6 +4,8 @@ import 'package:my_mpt/presentation/screens/calls_screen.dart';
 import 'package:my_mpt/presentation/screens/schedule_screen.dart';
 import 'package:my_mpt/presentation/screens/settings_screen.dart';
 import 'package:my_mpt/presentation/screens/today_schedule_screen.dart';
+import 'package:my_mpt/presentation/screens/welcome_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -57,6 +59,8 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  bool _isFirstLaunch = true;
+  bool _isLoading = true;
 
   final List<Widget> _screens = const [
     TodayScheduleScreen(),
@@ -73,7 +77,43 @@ class _MainScreenState extends State<MainScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _checkFirstLaunch();
+  }
+
+  Future<void> _checkFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstLaunch = prefs.getBool('first_launch') ?? true;
+    
+    setState(() {
+      _isFirstLaunch = isFirstLaunch;
+      _isLoading = false;
+    });
+  }
+
+  void _onSetupComplete() {
+    setState(() {
+      _isFirstLaunch = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFFFF8C00),
+          ),
+        ),
+      );
+    }
+
+    if (_isFirstLaunch) {
+      return WelcomeScreen(onSetupComplete: _onSetupComplete);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       body: IndexedStack(index: _currentIndex, children: _screens),
