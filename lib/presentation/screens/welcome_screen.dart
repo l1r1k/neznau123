@@ -204,11 +204,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: const Color(0xFFFF8C00),
+              color: Colors.white,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF8C00).withOpacity(0.3),
+                  color: Colors.white.withOpacity(0.3),
                   blurRadius: 20,
                   spreadRadius: 5,
                 ),
@@ -234,7 +234,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
-              color: Color(0xFFFF8C00),
+              color: Colors.white,
             ),
             textAlign: TextAlign.center,
           ),
@@ -256,7 +256,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 _loadSpecialties();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF8C00),
+                backgroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(25),
                 ),
@@ -309,9 +309,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFFFF8C00),
-                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       strokeWidth: 2,
                     ),
                   ),
@@ -341,7 +339,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     dropdownColor: const Color(0xFF111111),
                     icon: const Icon(
                       Icons.arrow_drop_down,
-                      color: Color(0xFFFF8C00),
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -360,7 +358,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   }
                 : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF8C00),
+              backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(25),
               ),
@@ -424,9 +422,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFFFF8C00),
-                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       strokeWidth: 2,
                     ),
                   ),
@@ -456,7 +452,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     dropdownColor: const Color(0xFF111111),
                     icon: const Icon(
                       Icons.arrow_drop_down,
-                      color: Color(0xFFFF8C00),
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -474,7 +470,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           child: ElevatedButton(
             onPressed: _selectedGroup != null ? _saveSelectionAndProceed : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF8C00),
+              backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(25),
               ),

@@ -155,9 +155,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       backgroundColor: _backgroundColor,
       body: SafeArea(
         child: isInitialLoading
-            ? const Center(child: CircularProgressIndicator(color: Colors.grey))
+            ? const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              )
             : RefreshIndicator(
                 onRefresh: () => _loadScheduleData(forceRefresh: true),
+                color: Colors.white,
                 child: CustomScrollView(
                   slivers: [
                     SliverToBoxAdapter(
@@ -245,14 +248,28 @@ class _Header extends StatelessWidget {
   /// Тип недели (числитель/знаменатель)
   final String weekType;
 
-  /// Градиент фона заголовка
-  static const List<Color> _gradient = [Color(0xFF333333), Color(0xFF111111)];
-
   const _Header({
     required this.borderColor,
     required this.dateLabel,
     required this.weekType,
   });
+
+  /// Получает градиент заголовка в зависимости от типа недели
+  ///
+  /// Параметры:
+  /// - [weekType]: Тип недели (Числитель/Знаменатель)
+  ///
+  /// Возвращает:
+  /// - List<Color>: Градиент для заголовка
+  List<Color> _getHeaderGradient(String weekType) {
+    if (weekType == 'Знаменатель') {
+      return const [Color(0xFF111111), Color(0xFF4FC3F7)];
+    } else if (weekType == 'Знаменатель') {
+      return const [Color(0xFF111111), Color(0xFFFF8C00)];
+    } else {
+      return const [Color(0xFF111111), Color(0xFF333333)];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -260,8 +277,8 @@ class _Header extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        gradient: const LinearGradient(
-          colors: _gradient,
+        gradient: LinearGradient(
+          colors: _getHeaderGradient(weekType),
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

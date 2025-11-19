@@ -39,11 +39,11 @@ class BuildingChip extends StatelessWidget {
       // Если здание не Наxимовский и не Нежинская, показываем "Дистанционно"
       displayLabel = 'Дистанционно';
       borderColor = const Color(
-        0xFF9C27B0,
-      ).withOpacity(0.3); // Фиолетовый для дистанционных занятий
+        0xFFFF8C00,
+      ).withOpacity(0.3); // Оранжевый для дистанционных занятий
       circleColor = const Color(
-        0xFF9C27B0,
-      ); // Фиолетовый для дистанционных занятий
+        0xFFFF8C00,
+      ); // Оранжевый для дистанционных занятий
     }
 
     final chip = Container(

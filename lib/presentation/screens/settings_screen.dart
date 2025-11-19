@@ -506,7 +506,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
               child: const Text(
                 'Закрыть',
-                style: TextStyle(color: Color(0xFFFF8C00)),
+                style: TextStyle(color: Colors.white),
               ),
             ),
           ],

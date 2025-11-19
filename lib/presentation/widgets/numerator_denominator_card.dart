@@ -52,7 +52,13 @@ class NumeratorDenominatorCard extends StatelessWidget {
           Container(
             width: 60,
             height: 120,
-            child: Center(child: _NumberBadge(number: lessonNumber)),
+            child: Center(
+              child: _NumberBadge(
+                number: lessonNumber,
+                showGradient:
+                    numeratorLesson == null || denominatorLesson == null,
+              ),
+            ),
           ),
 
           // Центральная часть - пары с разделителем
@@ -129,8 +135,7 @@ class NumeratorDenominatorCard extends StatelessWidget {
   /// - Widget: Виджет урока
   Widget _buildLessonItem(Schedule lesson, bool isNumerator) {
     final color = isNumerator
-        ? Colors
-              .grey // Серый для числителя
+        ? const Color(0xFFFF8C00) // Оранжевый для числителя
         : const Color(0xFF4FC3F7); // Голубой для знаменателя;
 
     return Expanded(
@@ -187,8 +192,7 @@ class NumeratorDenominatorCard extends StatelessWidget {
   /// - Widget: Виджет пустого урока
   Widget _buildEmptyLessonItem(bool isNumerator) {
     final color = isNumerator
-        ? Colors
-              .grey // Серый для числителя
+        ? const Color(0xFFFF8C00) // Оранжевый для числителя
         : const Color(0xFF4FC3F7); // Голубой для знаменателя;
 
     return Expanded(
@@ -232,7 +236,10 @@ class _NumberBadge extends StatelessWidget {
   /// Номер пары
   final String number;
 
-  const _NumberBadge({required this.number});
+  /// Показывать ли градиент
+  final bool showGradient;
+
+  const _NumberBadge({required this.number, this.showGradient = true});
 
   @override
   Widget build(BuildContext context) {
@@ -240,11 +247,14 @@ class _NumberBadge extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF333333), Color(0xFF111111)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: showGradient
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF333333), Color(0xFF111111)],
+              )
+            : null,
+        color: showGradient ? null : const Color(0xFF333333),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(

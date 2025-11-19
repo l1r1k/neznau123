@@ -27,10 +27,23 @@ class TodayScheduleScreen extends StatefulWidget {
 class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
   static const _backgroundColor = Color(0xFF000000);
   static const Color _lessonAccent = Colors.grey;
-  static const List<Color> _headerGradient = [
-    Color(0xFF333333),
-    Color(0xFF111111),
-  ];
+
+  /// Получает градиент заголовка в зависимости от типа недели
+  ///
+  /// Параметры:
+  /// - [weekType]: Тип недели (Числитель/Знаменатель)
+  ///
+  /// Возвращает:
+  /// - List<Color>: Градиент для заголовка
+  List<Color> _getHeaderGradient(String weekType) {
+    if (weekType == 'Знаменатель') {
+      return const [Color(0xFF111111), Color(0xFF4FC3F7)];
+    } else if (weekType == 'Знаменатель') {
+      return const [Color(0xFF111111), Color(0xFFFF8C00)];
+    } else {
+      return const [Color(0xFF111111), Color(0xFF333333)];
+    }
+  }
 
   late UnifiedScheduleRepository _repository;
   late ScheduleChangesRepository _changesRepository;
@@ -146,7 +159,9 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
       backgroundColor: _backgroundColor,
       body: SafeArea(
         child: isInitialLoading
-            ? const Center(child: CircularProgressIndicator(color: Colors.grey))
+            ? const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              )
             : PageView(
                 controller: _pageController,
                 onPageChanged: (index) {
@@ -157,10 +172,12 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
                 children: [
                   RefreshIndicator(
                     onRefresh: () => _fetchScheduleData(forceRefresh: true),
+                    color: Colors.white,
                     child: _buildSchedulePage(_todayScheduleData, 'Сегодня'),
                   ),
                   RefreshIndicator(
                     onRefresh: () => _fetchScheduleData(forceRefresh: true),
+                    color: Colors.white,
                     child: _buildSchedulePage(_tomorrowScheduleData, 'Завтра'),
                   ),
                 ],
@@ -208,7 +225,9 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
           child: _TodayHeader(
             dateLabel: dateLabel,
             lessonsCount: scheduleWithChanges.length,
-            gradient: _headerGradient,
+            gradient: _getHeaderGradient(
+              weekType ?? _weekInfo?.weekType ?? 'Неизвестно',
+            ),
             pageTitle: pageTitle,
             weekType: weekType ?? _weekInfo?.weekType ?? 'Неизвестно',
           ),
