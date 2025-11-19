@@ -504,6 +504,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
               },
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
               child: const Text(
                 'Закрыть',
                 style: TextStyle(color: Colors.white),

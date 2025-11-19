@@ -46,81 +46,83 @@ class NumeratorDenominatorCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          // Левая часть - номер пары
-          Container(
-            width: 60,
-            height: 120,
-            child: Center(
-              child: _NumberBadge(
-                number: lessonNumber,
-                showGradient:
-                    numeratorLesson == null || denominatorLesson == null,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Левая часть - номер пары
+            Container(
+              width: 60,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: _NumberBadge(
+                  number: lessonNumber,
+                  showGradient:
+                      numeratorLesson == null || denominatorLesson == null,
+                ),
               ),
             ),
-          ),
 
-          // Центральная часть - пары с разделителем
-          Expanded(
-            child: Container(
-              height: 120,
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Числитель
-                  if (numeratorLesson != null)
-                    _buildLessonItem(numeratorLesson!, true)
-                  else
-                    _buildEmptyLessonItem(true),
+            // Центральная часть - пары с разделителем
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Числитель
+                    if (numeratorLesson != null)
+                      _buildLessonItem(numeratorLesson!, true)
+                    else
+                      _buildEmptyLessonItem(true),
 
-                  // Разделитель
-                  Container(
-                    height: 1,
-                    color: const Color(0xFF333333),
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                  ),
-
-                  // Знаменатель
-                  if (denominatorLesson != null)
-                    _buildLessonItem(denominatorLesson!, false)
-                  else
-                    _buildEmptyLessonItem(false),
-                ],
-              ),
-            ),
-          ),
-
-          // Правая часть - время
-          Container(
-            width: 60,
-            height: 120,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    startTime,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                    // Разделитель
+                    Container(
+                      height: 1,
+                      color: const Color(0xFF333333),
+                      margin: const EdgeInsets.symmetric(vertical: 4),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    endTime,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.7),
-                    ),
-                  ),
-                ],
+
+                    // Знаменатель
+                    if (denominatorLesson != null)
+                      _buildLessonItem(denominatorLesson!, false)
+                    else
+                      _buildEmptyLessonItem(false),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+
+            // Правая часть - время
+            Container(
+              width: 60,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      startTime,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      endTime,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -140,6 +142,7 @@ class NumeratorDenominatorCard extends StatelessWidget {
 
     return Expanded(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Индикатор типа (числитель/знаменатель)
           Container(
@@ -162,8 +165,6 @@ class NumeratorDenominatorCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -197,6 +198,7 @@ class NumeratorDenominatorCard extends StatelessWidget {
 
     return Expanded(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Индикатор типа (числитель/знаменатель)
           Container(

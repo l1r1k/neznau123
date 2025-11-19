@@ -162,23 +162,40 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
             ? const Center(
                 child: CircularProgressIndicator(color: Colors.white),
               )
-            : PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPageIndex = index;
-                  });
-                },
+            : Stack(
                 children: [
-                  RefreshIndicator(
-                    onRefresh: () => _fetchScheduleData(forceRefresh: true),
-                    color: Colors.white,
-                    child: _buildSchedulePage(_todayScheduleData, 'Сегодня'),
+                  PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentPageIndex = index;
+                      });
+                    },
+                    children: [
+                      RefreshIndicator(
+                        onRefresh: () => _fetchScheduleData(forceRefresh: true),
+                        color: Colors.white,
+                        child: _buildSchedulePage(
+                          _todayScheduleData,
+                          'Сегодня',
+                        ),
+                      ),
+                      RefreshIndicator(
+                        onRefresh: () => _fetchScheduleData(forceRefresh: true),
+                        color: Colors.white,
+                        child: _buildSchedulePage(
+                          _tomorrowScheduleData,
+                          'Завтра',
+                        ),
+                      ),
+                    ],
                   ),
-                  RefreshIndicator(
-                    onRefresh: () => _fetchScheduleData(forceRefresh: true),
-                    color: Colors.white,
-                    child: _buildSchedulePage(_tomorrowScheduleData, 'Завтра'),
+                  // Добавляем индикатор страниц внизу экрана
+                  Positioned(
+                    bottom: 16,
+                    left: 0,
+                    right: 0,
+                    child: _PageIndicator(currentPageIndex: _currentPageIndex),
                   ),
                 ],
               ),
@@ -801,4 +818,40 @@ class _ScheduleChangesResult {
     required this.schedule,
     required this.hasBuildingOverride,
   });
+}
+
+class _PageIndicator extends StatelessWidget {
+  final int currentPageIndex;
+
+  const _PageIndicator({required this.currentPageIndex});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _PageDot(isActive: currentPageIndex == 0),
+        const SizedBox(width: 8),
+        _PageDot(isActive: currentPageIndex == 1),
+      ],
+    );
+  }
+}
+
+class _PageDot extends StatelessWidget {
+  final bool isActive;
+
+  const _PageDot({required this.isActive});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: isActive ? Colors.white : Colors.white.withOpacity(0.3),
+        shape: BoxShape.circle,
+      ),
+    );
+  }
 }
