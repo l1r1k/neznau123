@@ -29,6 +29,12 @@ class BuildingChip extends StatelessWidget {
         0xFF2196F3,
       ).withOpacity(0.3); // Синий для Нежинской
       circleColor = const Color(0xFF2196F3); // Синий для Нежинской
+    } else if (label == 'Нахимовский') {
+      // Серый цвет для Наxимовского корпуса
+      borderColor = const Color(
+        0xFF9E9E9E,
+      ).withOpacity(0.3); // Серый для Наxимовского
+      circleColor = const Color(0xFF9E9E9E); // Серый для Наxимовского
     } else if (label != 'Нахимовский' && label != 'Нежинская') {
       // Если здание не Наxимовский и не Нежинская, показываем "Дистанционно"
       displayLabel = 'Дистанционно';
@@ -85,11 +91,7 @@ class BuildingChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(
-          Icons.info_outline,
-          size: 16,
-          color: Colors.redAccent,
-        ),
+        const Icon(Icons.info_outline, size: 16, color: Colors.redAccent),
         const SizedBox(width: 8),
         chip,
       ],
