@@ -22,7 +22,7 @@
 
 ## Установка приложения
 
-Приложение доступно в RuStore	- [<img align="center" height="45" alt="logo-color-dark" src="https://github.com/user-attachments/assets/bd6014bd-a5c7-4130-bd31-80c8b57e13a2" />](https://www.rustore.ru/catalog/app/com.example.seacard)
+Приложение доступно в RuStore	- [<img align="center" height="45" alt="logo-color-dark" src="https://github.com/user-attachments/assets/bd6014bd-a5c7-4130-bd31-80c8b57e13a2" />](https://www.rustore.ru/catalog/app/ru.merrcurys.my_mpt)
 
 APK-релизы можно скачать с GitHub -[<img align="center" height="60" alt="logo-color-dark" src="https://github.com/user-attachments/assets/1a481370-4323-40e8-94b8-0106b9fc5363" />](https://github.com/Merrcurys/MyMPT/releases)
 
@@ -37,7 +37,11 @@ APK-релизы можно скачать с GitHub -[<img align="center" heigh
 - Язык программирования: Dart
 - Фреймворк: Flutter
 
+## Разработчики
+
+- [Себежко Александр Андреевич](https://github.com/merrcurys)
+- [Симернин Матвей Александрович](https://github.com/E-eclipse)
+
 ## Лицензия
 
 «Мой МПТ» расспространяется под лицензией GNU GPL-3.0.
-
