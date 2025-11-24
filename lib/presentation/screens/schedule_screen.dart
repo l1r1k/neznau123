@@ -264,7 +264,7 @@ class _Header extends StatelessWidget {
   List<Color> _getHeaderGradient(String weekType) {
     if (weekType == 'Знаменатель') {
       return const [Color(0xFF111111), Color(0xFF4FC3F7)];
-    } else if (weekType == 'Знаменатель') {
+    } else if (weekType == 'Числитель') {
       return const [Color(0xFF111111), Color(0xFFFF8C00)];
     } else {
       return const [Color(0xFF111111), Color(0xFF333333)];
