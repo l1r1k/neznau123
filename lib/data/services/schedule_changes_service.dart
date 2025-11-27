@@ -41,7 +41,7 @@ class ScheduleChangesService {
     try {
       // Проверяем кэш
       if (!forceRefresh) {
-        final cachedChanges = await _getCachedChanges(groupCode);
+        final cachedChanges = await _getCachedChanges(groupCode: groupCode);
         if (cachedChanges != null) {
           return cachedChanges;
         }
@@ -166,7 +166,7 @@ class ScheduleChangesService {
         }
 
         // Сохраняем в кэш
-        await _saveCachedChanges(groupCode, changes);
+        await _saveCachedChanges(changes, groupCode: groupCode);
 
         return changes;
       } else {
@@ -181,12 +181,151 @@ class ScheduleChangesService {
     }
   }
 
+   /// Основная функция парсинга всех изменений для конкретного преподавателя
+  Future<List<ScheduleChange>> parseChanges(String teacherName, {bool forceRefresh = false, }) async {
+    try{
+      // Проверяем кэш
+      if (!forceRefresh) {
+        final cachedChanges = await _getCachedChanges(teacherName: teacherName);
+        if (cachedChanges != null) {
+          return cachedChanges;
+        }
+      }
+
+      // Отправляем HTTP-запрос к странице изменений в расписании
+      final response = await http
+          .get(Uri.parse(baseUrl))
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception(
+                'Превышено время ожидания ответа от сервера (15 секунд)',
+              );
+            },
+          );
+
+      if (response.statusCode == 200){
+      final document = parser.parse(response.body);
+      final result = <String, List<ScheduleChange>>{};
+
+      // Все блоки-дней вида <h4>Дата</h4> + <table>...</table>
+      final h4s = document.querySelectorAll("h4");
+
+      // Считываем время последнего обновления HTML
+      final updatedText = document.querySelector("p.text-muted")?.text ?? "";
+      final updatedAt = _parseUpdatedAt(updatedText);
+
+      for (var h4 in h4s) {
+        final dateStr = h4.text.trim();
+        final changeDate = _parseDate(dateStr);
+
+        // Находим таблицу сразу после h4
+        final table = h4.nextElementSibling;
+        if (table == null || table.localName != "table") continue;
+
+        final rows = table.querySelectorAll("tbody tr");
+        for (var row in rows) {
+          final cols = row.querySelectorAll("td");
+          if (cols.length < 3) continue;
+
+          final number = int.tryParse(cols[0].text.trim());
+          if (number == null) continue;
+
+          final fromHtml = cols[1];
+          final toHtml = cols[2];
+
+          final replaceFrom = _cleanCell(fromHtml);
+          final replaceTo = _cleanCell(toHtml);
+
+          // Собираем преподавателей
+          final teachers = _extractTeachers(fromHtml) + _extractTeachers(toHtml);
+          if (teachers.isEmpty) continue;
+
+          for (var teacher in teachers) {
+            result.putIfAbsent(teacher, () => []);
+            result[teacher]!.add(
+              ScheduleChange(
+                lessonNumber: number.toString(),
+                replaceFrom: replaceFrom,
+                replaceTo: replaceTo,
+                updatedAt: updatedAt.toString(),
+                changeDate: changeDate.toString(),
+              ),
+            );
+          }
+        }
+      }
+
+      await _saveCachedChanges(result[teacherName]!, teacherName: teacherName);
+
+      return result[teacherName]!;
+      } else {
+        throw Exception('Ошибка при попытке получить страницу изменения в расписании!');
+      }
+    }
+    catch (e){
+      throw Exception('Ошибка при попытке получить изменения в расписании у преподавателя!');
+    }
+  }
+
+  // Извлекает текст предмета/состояния пары (с учётом отмен/пустых пар)
+  String _cleanCell(Element td) {
+    // Если в ячейке есть <span class="label-danger">Отмена</span>
+    final cancel = td.querySelector(".label-danger");
+    if (cancel != null) return cancel.text.trim();
+
+    // Например: "Свободно", "—", пустая строка
+    final text = td.text.trim();
+    if (text.isEmpty || text == "-" || text == "—") {
+      return "Нет пары";
+    }
+
+    return text.replaceAll(RegExp(r"\s+"), " ").trim();
+  }
+
+  // Достаёт преподавателей из ячейки
+  List<String> _extractTeachers(Element td) {
+    final raw = td.text;
+    final matches = RegExp(r"[А-ЯЁA-Z]\.[А-ЯЁA-Z]\.\s?[А-ЯЁA-Z][а-яёa-z]+")
+        .allMatches(raw);
+
+    return matches.map((m) => m.group(0)!.trim()).toSet().toList();
+  }
+
+  DateTime _parseDate(String s) {
+    // Формат в Changes: "18.11.2022"
+    final parts = s.split(".");
+    if (parts.length == 3) {
+      final d = int.tryParse(parts[0]) ?? 1;
+      final m = int.tryParse(parts[1]) ?? 1;
+      final y = int.tryParse(parts[2]) ?? 2020;
+      return DateTime(y, m, d);
+    }
+    return DateTime.now();
+  }
+
+  DateTime _parseUpdatedAt(String text) {
+    // пример: "Последнее обновление: 17.11.2022 19:14"
+    final match = RegExp(r"(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2})")
+        .firstMatch(text);
+
+    if (match == null) return DateTime.now();
+
+    final d = int.parse(match.group(1)!);
+    final m = int.parse(match.group(2)!);
+    final y = int.parse(match.group(3)!);
+    final h = int.parse(match.group(4)!);
+    final min = int.parse(match.group(5)!);
+
+    return DateTime(y, m, d, h, min);
+  }
+
   /// Получает кэшированные изменения
-  Future<List<ScheduleChange>?> _getCachedChanges(String groupCode) async {
+  Future<List<ScheduleChange>?> _getCachedChanges({String? groupCode, String? teacherName}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cacheKey = '$_cacheKeyChanges${groupCode.hashCode}';
-      final timestampKey = '$_cacheKeyChangesTimestamp${groupCode.hashCode}';
+      final cacheKey = '$_cacheKeyChanges${groupCode != null ? groupCode.hashCode : teacherName.hashCode}';
+      final timestampKey = '$_cacheKeyChangesTimestamp${groupCode != null ? groupCode.hashCode : teacherName.hashCode}';
       
       final timestamp = prefs.getInt(timestampKey);
       final cachedJson = prefs.getString(cacheKey);
@@ -223,11 +362,11 @@ class ScheduleChangesService {
   }
 
   /// Сохраняет изменения в кэш
-  Future<void> _saveCachedChanges(String groupCode, List<ScheduleChange> changes) async {
+  Future<void> _saveCachedChanges(List<ScheduleChange> changes, {String? groupCode, String? teacherName}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cacheKey = '$_cacheKeyChanges${groupCode.hashCode}';
-      final timestampKey = '$_cacheKeyChangesTimestamp${groupCode.hashCode}';
+      final cacheKey = '$_cacheKeyChanges${groupCode != null ? groupCode.hashCode : teacherName.hashCode}';
+      final timestampKey = '$_cacheKeyChangesTimestamp${groupCode != null ? groupCode.hashCode : teacherName.hashCode}';
       
       final json = jsonEncode(changes.map((change) => {
         'lessonNumber': change.lessonNumber,

@@ -12,7 +12,7 @@ class LessonCard extends StatelessWidget {
   final String subject;
 
   /// Преподаватель
-  final String teacher;
+  final String groupName;
 
   /// Время начала пары
   final String startTime;
@@ -27,7 +27,7 @@ class LessonCard extends StatelessWidget {
     super.key,
     required this.number,
     required this.subject,
-    required this.teacher,
+    required this.groupName,
     required this.startTime,
     required this.endTime,
     required this.accentColor,
@@ -69,7 +69,7 @@ class LessonCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    teacher,
+                    groupName,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.white.withOpacity(0.7),

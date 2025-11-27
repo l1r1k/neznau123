@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:my_mpt/domain/entities/specialty.dart';
 import 'package:my_mpt/domain/entities/group.dart';
+import 'package:my_mpt/domain/entities/teacher.dart';
 import 'package:my_mpt/domain/usecases/get_specialties_usecase.dart';
 import 'package:my_mpt/domain/usecases/get_groups_by_specialty_usecase.dart';
 import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
 import 'package:my_mpt/data/repositories/mpt_repository.dart' as repo_impl;
 import 'package:my_mpt/data/services/preload_service.dart';
+import 'package:my_mpt/domain/usecases/get_teacher_usecase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Экран приветствия и настройки приложения
@@ -33,6 +35,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   /// Use case для получения списка групп по специальности
   late GetGroupsBySpecialtyUseCase _getGroupsBySpecialtyUseCase;
 
+  late GetTeachersUseCase _getTeachersUseCase;
+
   /// Сервис предзагрузки данных
   final PreloadService _preloadService = PreloadService();
 
@@ -42,11 +46,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   /// Список групп
   List<Group> _groups = [];
 
+  List<Teacher> _teachers = [];
+
   /// Выбранная специальность
   Specialty? _selectedSpecialty;
 
   /// Выбранная группа
   Group? _selectedGroup;
+
+  Teacher? _selectedTeacher;
 
   /// Флаг загрузки специальностей
   bool _isLoading = false;
@@ -57,8 +65,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   /// Текущая страница (0: приветствие, 1: выбор специальности, 2: выбор группы)
   int _currentPage = 0;
 
+  static const String _selectedRole = 'selected_role';
+
   /// Ключ для хранения выбранной группы в настройках
   static const String _selectedGroupKey = 'selected_group';
+
+  static const String _teacherNameKey = 'teacher';
 
   /// Ключ для хранения выбранной специальности в настройках
   static const String _selectedSpecialtyKey = 'selected_specialty';
@@ -72,6 +84,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     _repository = repo_impl.MptRepository();
     _getSpecialtiesUseCase = GetSpecialtiesUseCase(_repository);
     _getGroupsBySpecialtyUseCase = GetGroupsBySpecialtyUseCase(_repository);
+    _getTeachersUseCase = GetTeachersUseCase(_repository);
     // Предзагружаем все данные при первом запуске
     _preloadAllData();
   }
@@ -134,6 +147,30 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     }
   }
 
+    Future<void> _loadTeachers() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final teachers = await _getTeachersUseCase();
+      setState(() {
+        _teachers = teachers;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print(e);
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка загрузки преподавателей')),
+        );
+      }
+    }
+  }
+
   /// Сохранение выбранной специальности и группы и переход к основному приложению
   Future<void> _saveSelectionAndProceed() async {
     if (_selectedSpecialty == null || _selectedGroup == null) {
@@ -154,7 +191,38 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         '${_selectedSpecialtyKey}_name',
         _selectedSpecialty!.name,
       );
+      await prefs.setString(_selectedRole, 'student');
       await prefs.setString(_selectedGroupKey, _selectedGroup!.code);
+      await prefs.setBool(_firstLaunchKey, false);
+
+      if (mounted) {
+        widget.onSetupComplete();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка сохранения настроек')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveTeacherAndProceed() async {
+    if (_selectedTeacher == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Пожалуйста, выберите преподавателя'),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_teacherNameKey, _selectedTeacher!.teacherName);
+      await prefs.setString(_selectedRole, 'teacher');
       await prefs.setBool(_firstLaunchKey, false);
 
       if (mounted) {
@@ -194,9 +262,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       case 0:
         return _buildWelcomePage();
       case 1:
-        return _buildSpecialtySelectionPage();
+        return _buildVersionSelectionPage();
       case 2:
+        return _buildSpecialtySelectionPage();
+      case 3:
         return _buildGroupSelectionPage();
+      case 4:
+        return _buildTeacherSelectionPage();
       default:
         return _buildWelcomePage();
     }
@@ -242,7 +314,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            '"Мой МПТ"',
+            '"neznau123"',
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -252,7 +324,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
           const SizedBox(height: 30),
           const Text(
-            'Мы рады, что вы выбрали именно этот техникум для обучения. Мы разработали это приложение, чтобы вам было более комфортно смотреть расписание.',
+            'Мы рады, что вы выбрали именно этот техникум для обучения или работы.\n\nСтуденты разработали это приложение, чтобы студентам было более комфортно смотреть расписание.\n\nА я разработал этот форк, чтобы преподаватели не оставались обездоленными.',
             style: TextStyle(fontSize: 16, color: Colors.white70, height: 1.5),
             textAlign: TextAlign.center,
           ),
@@ -266,6 +338,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   _currentPage = 1;
                 });
                 _loadSpecialties();
+                _loadTeachers();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -286,6 +359,89 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildVersionSelectionPage() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          'Выберите версию',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 30),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: () {
+                    setState(() {
+                      _currentPage = 2;
+                    });
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+              elevation: 5,
+            ),
+            child: const Text(
+              'Студент',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 40),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: () {
+                    setState(() {
+                      _currentPage = 4;
+                    });
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+              elevation: 5,
+            ),
+            child: const Text(
+              'Преподаватель',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _currentPage = 0;
+            });
+          },
+          child: const Text(
+            'Назад',
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+        ),
+      ],
     );
   }
 
@@ -364,7 +520,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             onPressed: _selectedSpecialty != null
                 ? () {
                     setState(() {
-                      _currentPage = 2;
+                      _currentPage = 3;
                     });
                     _loadGroups(_selectedSpecialty!.code);
                   }
@@ -390,7 +546,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         TextButton(
           onPressed: () {
             setState(() {
-              _currentPage = 0;
+              _currentPage = 1;
             });
           },
           child: const Text(
@@ -481,6 +637,114 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           height: 50,
           child: ElevatedButton(
             onPressed: _selectedGroup != null ? _saveSelectionAndProceed : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+              elevation: 5,
+            ),
+            child: const Text(
+              'Готово',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _currentPage = 1;
+            });
+          },
+          child: const Text(
+            'Назад',
+            style: TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTeacherSelectionPage() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text(
+          'Выберите преподавателя',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 30),
+        Container(
+          height: 50, // Уменьшена высота контейнера
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: _isGroupsLoading
+              ? const Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      strokeWidth: 2,
+                    ),
+                  ),
+                )
+              : DropdownButtonHideUnderline(
+                  child: DropdownButton<Teacher>(
+                    value: _selectedTeacher,
+                    hint: const Text(
+                      'Выберите преподавателя',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    items: _teachers.map((Teacher teacher) {
+                      return DropdownMenuItem<Teacher>(
+                        value: teacher,
+                        child: Text(
+                          teacher.teacherName,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (Teacher? newValue) {
+                      setState(() {
+                        _selectedTeacher = newValue;
+                      });
+                    },
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF111111),
+                    icon: const Icon(
+                      Icons.arrow_drop_down,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Поменять преподавателя можно в настройках',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        const SizedBox(height: 30),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: _selectedTeacher != null ? _saveTeacherAndProceed : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(

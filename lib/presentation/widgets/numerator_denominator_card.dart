@@ -168,7 +168,7 @@ class NumeratorDenominatorCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  lesson.teacher,
+                  lesson.groupName ?? '',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.white.withOpacity(0.7),

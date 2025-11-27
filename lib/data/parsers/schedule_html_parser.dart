@@ -4,11 +4,249 @@ import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:my_mpt/data/models/lesson.dart';
 
-/// Отвечает за превращение HTML-ответа в структурированные данные расписания
-///
-/// Этот класс реализует парсинг HTML-страницы с расписанием и преобразование
-/// данных в структурированный формат для дальнейшего использования в приложении
-class ScheduleHtmlParser {
+class ScheduleTeacherParser {
+  ScheduleTeacherParser();
+
+  static const dayOrder = [
+    "ПОНЕДЕЛЬНИК",
+    "ВТОРНИК",
+    "СРЕДА",
+    "ЧЕТВЕРГ",
+    "ПЯТНИЦА",
+    "СУББОТА",
+    "ВОСКРЕСЕНЬЕ",
+  ];
+
+  static const time = {
+    1: ('8:30', '10:00'),
+    2: ('10:10', '11:40'),
+    3: ('12:00', '13:30'),
+    4: ('13:50', '15:20'),
+    5: ('15:30', '17:00'),
+  };
+
+    Map<String, List<Lesson>>? parseHTML(String html, String teacherName) {
+    final document = html_parser.parse(html);
+    final Map<String, Map<String, List<Lesson>>> result = {};
+
+    final tabPanes = document.querySelectorAll('div.tab-pane');
+
+    for (var pane in tabPanes) {
+      final groupHeader = pane.querySelector('h3');
+      if (groupHeader == null) continue;
+
+      final groupName = groupHeader.text.replaceAll('Группа ', '').trim();
+
+      // Собираем только таблицы данной группы (до следующего <h3>)
+      final tables = <Element>[];
+      bool inside = false;
+      for (var node in pane.nodes) {
+        if (node is Element && node.localName == 'h3') {
+          final text = node.text.replaceAll('Группа ', '').trim();
+          if (text == groupName) {
+            inside = true;
+            continue;
+          } else {
+            inside = false;
+          }
+        }
+        if (inside && node is Element && node.localName == 'table') {
+          tables.add(node);
+        }
+      }
+
+      for (var table in tables) {
+        final h4 = table.querySelector('h4');
+        if (h4 == null) continue;
+
+        final dayAndLocation = _extractDayAndLocation(h4);
+
+        // Последний tbody содержит реальные пары
+        final tbodies = table.querySelectorAll('tbody');
+        if (tbodies.isEmpty) continue;
+        final tbody = tbodies.last;
+        final rows = tbody.querySelectorAll('tr');
+
+        for (var row in rows) {
+          final cols = row.querySelectorAll('td');
+          if (cols.length != 3) continue;
+
+          final num = int.tryParse(cols[0].text.trim());
+          if (num == null) continue;
+
+          // извлекаем предметы по типу (numerator/denominator/default)
+          final subjectMap = _extractByType(cols[1]);
+          // извлекаем преподавателей по типу
+          final teacherMap = _extractByType(cols[2]);
+
+          final hasSubNum = subjectMap['numerator'] != null;
+          final hasSubDen = subjectMap['denominator'] != null;
+          final hasSubDef = subjectMap['default'] != null;
+
+          final hasTeachNum = teacherMap['numerator'] != null;
+          final hasTeachDen = teacherMap['denominator'] != null;
+          final hasTeachDef = teacherMap['default'] != null;
+
+          // 1) Если есть числитель (только тогда) — создаём записи для числителя (если есть преподаватель)
+          if (hasSubNum || hasTeachNum) {
+            final subj = subjectMap['numerator'];
+            final teach = teacherMap['numerator'];
+            if (_hasText(teach)) {
+              final teachers = _splitTeachers(teach!);
+              for (var t in teachers) {
+                _addLesson(result, t, Lesson(
+                  number: num.toString(),
+                  subject: subj ?? '',
+                  groupName: groupName,
+                  startTime: time[num]!.$1,
+                  endTime: time[num]!.$2,
+                  building: dayAndLocation.$2,
+                  lessonType: 'numerator',
+                ), dayAndLocation.$1);
+              }
+            }
+            // если предмет есть, а преподавателя нет — ничего не добавляем для этой части
+          }
+
+          // 2) Если есть знаменатель (только тогда) — создаём записи для знаменателя (если есть преподаватель)
+          if (hasSubDen || hasTeachDen) {
+            final subj = subjectMap['denominator'];
+            final teach = teacherMap['denominator'];
+            if (_hasText(teach)) {
+              final teachers = _splitTeachers(teach!);
+              for (var t in teachers) {
+                _addLesson(result, t, Lesson(
+                  number: num.toString(),
+                  subject: subj ?? '',
+                  groupName: groupName,
+                  startTime: time[num]!.$1,
+                  endTime: time[num]!.$2,
+                  building: dayAndLocation.$2,
+                  lessonType: 'denominator',
+                ), dayAndLocation.$1);
+              }
+            }
+          }
+
+          // 3) Если **ни** numerator, ни denominator присутствуют в предметах и преподавателях —
+          //    считаем это ОДНОЙ обычной парой (weekType = null), но только если есть преподаватель default.
+          if (!hasSubNum && !hasSubDen && !hasTeachNum && !hasTeachDen) {
+            final subj = subjectMap['default'];
+            final teach = teacherMap['default'];
+            if (_hasText(teach)) {
+              final teachers = _splitTeachers(teach!);
+              for (var t in teachers) {
+                _addLesson(result, t, Lesson(
+                  number: num.toString(),
+                  subject: subj ?? '',
+                  groupName: groupName,
+                  startTime: time[num]!.$1,
+                  endTime: time[num]!.$2,
+                  building: dayAndLocation.$2,
+                  lessonType: null,
+                ), dayAndLocation.$1);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Сортируем пары и дни недели
+    for (var teacher in result.keys.toList()) {
+      // сортировка пар
+      for (var day in result[teacher]!.keys) {
+        result[teacher]![day]!.sort((a, b) {
+          final cmp = a.number.compareTo(b.number);
+          if (cmp != 0) return cmp;
+          // если номера равны, упорядочим: обычная (null) -> Числитель -> Знаменатель
+          final order = {null: 0, 'Числитель': 1, 'Знаменатель': 2};
+          return (order[a.lessonType] ?? 3).compareTo(order[b.lessonType] ?? 3);
+        });
+      }
+
+      // сортировка дней по dayOrder
+      result[teacher] = Map<String, List<Lesson>>.fromEntries(
+        result[teacher]!.entries.toList()
+          ..sort((a, b) {
+            final dayA = a.key.split(' ').first;
+            final dayB = b.key.split(' ').first;
+            final ia = dayOrder.indexOf(dayA);
+            final ib = dayOrder.indexOf(dayB);
+            return ia.compareTo(ib);
+          }),
+      );
+    }
+
+    return result[teacherName];
+  }
+
+  void _addLesson(Map<String, Map<String, List<Lesson>>> result, String teacher, Lesson lesson, String day) {
+    result.putIfAbsent(teacher, () => {});
+    result[teacher]!.putIfAbsent(day, () => []);
+    result[teacher]![day]!.add(lesson);
+  }
+
+  /// Возвращает map с ключами 'numerator','denominator','default' - значения nullable String
+  Map<String, String?> _extractByType(Element td) {
+    String? numerator;
+    String? denominator;
+    String? def;
+
+    final numEl = td.querySelector('.label-danger');
+    final denEl = td.querySelector('.label-info');
+
+    if (numEl != null) numerator = _normalizeText(numEl.text);
+    if (denEl != null) denominator = _normalizeText(denEl.text);
+
+    // если нет специальных блоков, берем общий текст (trim)
+    if (numerator == null && denominator == null) {
+      final full = td.text.trim();
+      if (full.isNotEmpty) def = _normalizeText(full);
+    }
+
+    return {
+      'numerator': numerator,
+      'denominator': denominator,
+      'default': def,
+    };
+  }
+
+  bool _hasText(String? s) => s != null && s.trim().isNotEmpty;
+
+  List<String> _splitTeachers(String s) {
+    return s.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+  }
+
+  String _normalizeText(String s) {
+    return s.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  /// Правильное извлечение день недели + локация из <h4>
+  (String, String) _extractDayAndLocation(Element h4) {
+    String day = "";
+    String? location;
+
+    for (var node in h4.nodes) {
+      if (node.nodeType == Node.TEXT_NODE) {
+        final text = node.text!.trim();
+        if (text.isNotEmpty) {
+          day = text;
+        }
+      }
+
+      if (node is Element && node.localName == 'span') {
+        final loc = node.text.trim();
+        if (loc.isNotEmpty) location = loc;
+      }
+    }
+
+    location ??= "Дистанционно";
+    return (day, location);
+  }
+}
+
+class ScheduleGroupParser {
   /// Регулярное выражение для извлечения времени из текста
   static final RegExp _timePattern = RegExp(
     r'(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})',
@@ -29,7 +267,7 @@ class ScheduleHtmlParser {
   ///
   /// Возвращает:
   /// - Map<String, List<Lesson>>: Расписание, где ключ - день недели, значение - список уроков
-  Map<String, List<Lesson>> parse(String html, String groupCode) {
+  Map<String, List<Lesson>> parseHTML(String html, String groupCode) {
     // Парсим HTML-документ
     final document = html_parser.parse(html);
     // Находим вкладку для указанной группы

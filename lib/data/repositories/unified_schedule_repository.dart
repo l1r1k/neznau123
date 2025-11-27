@@ -9,6 +9,7 @@ class UnifiedScheduleRepository {
   final ScheduleParserService _parserService = ScheduleParserService();
   final ScheduleCacheDataSource _cacheDataSource = ScheduleCacheDataSource();
   static const String _selectedGroupKey = 'selected_group';
+  static const String _selectedTeacherName = 'teacher';
 
   // Кэшированные данные
   Map<String, List<Schedule>>? _cachedWeeklySchedule;
@@ -80,34 +81,60 @@ class UnifiedScheduleRepository {
     try {
       // Получаем выбранную группу
       final groupCode = await _getSelectedGroupCode();
-      if (groupCode.isEmpty) {
+      final teacher = await _getTeacher();
+      final Map<String, List<Schedule>> weeklySchedule = {};
+      if (groupCode.isEmpty && teacher.isEmpty) {
         await _clearCache();
         return;
       }
 
-      // Получаем расписание с парсера
-      final parsedSchedule = await _parserService.parseScheduleForGroup(
-        groupCode,
-        forceRefresh: forceRefresh,
-      );
-      
-      // Преобразуем данные в Schedule
-      final Map<String, List<Schedule>> weeklySchedule = {};
-      parsedSchedule.forEach((day, lessons) {
-        final List<Schedule> scheduleList = lessons.map((lesson) {
-          return Schedule(
-            id: '${day}_${lesson.number}',
-            number: lesson.number,
-            subject: lesson.subject,
-            teacher: lesson.teacher,
-            startTime: lesson.startTime,
-            endTime: lesson.endTime,
-            building: lesson.building,
-            lessonType: lesson.lessonType,
-          );
-        }).toList();
-        weeklySchedule[day] = scheduleList;
-      });
+      if (groupCode.isNotEmpty){
+        // Получаем расписание с парсера
+        final parsedSchedule = await _parserService.parseScheduleForGroup(
+          groupCode,
+          forceRefresh: forceRefresh,
+        );
+        
+        // Преобразуем данные в Schedule
+        parsedSchedule!.forEach((day, lessons) {
+          final List<Schedule> scheduleList = lessons.map((lesson) {
+            return Schedule(
+              id: '${day}_${lesson.number}',
+              number: lesson.number,
+              subject: lesson.subject,
+              teacher: lesson.teacher,
+              startTime: lesson.startTime,
+              endTime: lesson.endTime,
+              building: lesson.building,
+              lessonType: lesson.lessonType,
+            );
+          }).toList();
+          weeklySchedule[day] = scheduleList;
+        });
+      } else {
+        // Получаем расписание с парсера
+        final parsedSchedule = await _parserService.parseScheduleForTeacher(
+          teacher,
+          forceRefresh: forceRefresh,
+        );
+        
+        // Преобразуем данные в Schedule
+        parsedSchedule!.forEach((day, lessons) {
+          final List<Schedule> scheduleList = lessons.map((lesson) {
+            return Schedule(
+              id: '${day}_${lesson.number}',
+              number: lesson.number,
+              subject: lesson.subject,
+              groupName: lesson.groupName,
+              startTime: lesson.startTime,
+              endTime: lesson.endTime,
+              building: lesson.building,
+              lessonType: lesson.lessonType,
+            );
+          }).toList();
+          weeklySchedule[day] = scheduleList;
+        });
+      }
 
       // Обновляем кэш
       _cachedWeeklySchedule = weeklySchedule;
@@ -160,6 +187,23 @@ class UnifiedScheduleRepository {
       // Если переменная окружения не задана, используем SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_selectedGroupKey) ?? '';
+    } catch (e) {
+      debugPrint('Ошибка получения выбранной группы из настроек: $e');
+      return '';
+    }
+  }
+
+  Future<String> _getTeacher() async {
+    try {
+      // Проверяем переменную окружения first
+      const envTeacher = String.fromEnvironment('TEACHER');
+      if (envTeacher.isNotEmpty) {
+        return envTeacher;
+      }
+      
+      // Если переменная окружения не задана, используем SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_selectedTeacherName) ?? '';
     } catch (e) {
       debugPrint('Ошибка получения выбранной группы из настроек: $e');
       return '';

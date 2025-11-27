@@ -9,8 +9,11 @@ class Lesson {
   /// Название предмета
   final String subject;
 
+  /// Название группы
+  final String? groupName;
+
   /// Преподаватель
-  final String teacher;
+  final String? teacher;
 
   /// Время начала пары
   final String startTime;
@@ -29,7 +32,8 @@ class Lesson {
   /// Параметры:
   /// - [number]: Номер пары (обязательный)
   /// - [subject]: Название предмета (обязательный)
-  /// - [teacher]: Преподаватель (обязательный)
+  /// - [groupName]: Название группы (опциональный)
+  /// - [teacher]: Преподаватель (опциональный)
   /// - [startTime]: Время начала пары (обязательный)
   /// - [endTime]: Время окончания пары (обязательный)
   /// - [building]: Корпус проведения пары (обязательный)
@@ -37,7 +41,8 @@ class Lesson {
   Lesson({
     required this.number,
     required this.subject,
-    required this.teacher,
+    this.groupName,
+    this.teacher,
     required this.startTime,
     required this.endTime,
     required this.building,
@@ -46,7 +51,7 @@ class Lesson {
 
   @override
   String toString() {
-    return 'Lesson(number: $number, subject: $subject, teacher: $teacher, startTime: $startTime, endTime: $endTime, building: $building)';
+    return 'Lesson(number: $number, subject: $subject, groupName: $groupName, teacher: $teacher, startTime: $startTime, endTime: $endTime, building: $building)';
   }
 
   /// Преобразует объект урока в JSON
@@ -57,6 +62,7 @@ class Lesson {
     return {
       'number': number,
       'subject': subject,
+      'groupName': groupName,
       'teacher': teacher,
       'startTime': startTime,
       'endTime': endTime,

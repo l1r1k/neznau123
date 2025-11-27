@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart';
 import 'package:my_mpt/data/models/tab_info.dart';
+import 'package:my_mpt/data/models/teacher_info.dart';
 import 'package:my_mpt/data/models/week_info.dart';
 import 'package:my_mpt/data/models/group_info.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +24,8 @@ class MptParserService {
   static const String _cacheKeyTabsTimestamp = 'mpt_parser_tabs_timestamp';
   static const String _cacheKeyGroups = 'mpt_parser_groups_';
   static const String _cacheKeyGroupsTimestamp = 'mpt_parser_groups_timestamp_';
+  static const String _cacheTeachersKey = 'mpt_parser_teachers_';
+  static const String _cacheTeachersTimestamp = 'mpt_parser_teachers_timestamp_';
 
   /// Парсит список вкладок специальностей с главной страницы расписания
   ///
@@ -477,6 +480,206 @@ class MptParserService {
     }
   }
 
+  Future<List<TeacherInfo>> parseTeachers({
+    bool forceRefresh = false,
+  }) async {
+    try{
+      if (!forceRefresh) {
+        final cachedTeachers = await _getCachedTeachers();
+        if (cachedTeachers != null) {
+          return cachedTeachers;
+        }
+      }
+
+      final response = await http
+          .get(Uri.parse(baseUrl))
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception(
+                'Превышено время ожидания ответа от сервера (15 секунд)',
+              );
+            },
+          );
+
+      if (response.statusCode == 200){
+        final document = parser.parse(response.body);
+
+        final Set<String> result = {};
+        final List<TeacherInfo> teachers = [];
+
+        // Регекс для поиска ФИО (ищем хотя бы один шаблон И.О. Фамилия)
+        final fioRegex = RegExp(r'[А-ЯЁA-Z]\.[А-ЯЁA-Z]\.\s?[А-ЯЁа-яёA-Za-z\-]+');
+
+        final tables = document.querySelectorAll('table');
+
+        for (var table in tables) {
+          // пытаемся найти индекс колонки "Преподаватель"
+          int teacherIndex = _findTeacherColumnIndex(table);
+
+          // Берём все строки tbody (если нет tbody — берём все tr)
+          final rows = table.querySelectorAll('tbody tr');
+          final iterRows = rows.isNotEmpty ? rows : table.querySelectorAll('tr');
+
+          for (var row in iterRows) {
+            // пропускаем заголовочные строки
+            if (row.querySelectorAll('th').isNotEmpty) continue;
+
+            final cols = row.querySelectorAll('td');
+            if (cols.isEmpty) continue;
+
+            // если найден индекс, но он выходит за пределы, корректируем
+            Element teacherCell;
+            if (teacherIndex >= 0 && teacherIndex < cols.length) {
+              teacherCell = cols[teacherIndex];
+            } else {
+              // fallback — берем последнюю колонку
+              teacherCell = cols.last;
+            }
+
+            // 1) вытаскиваем label-danger / label-info — но добавляем только те, где есть ФИО
+            final labels = teacherCell.querySelectorAll('.label-danger, .label-info');
+            final List<String> goodLabels = [];
+            for (var lbl in labels) {
+              final txt = lbl.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+              if (txt.isNotEmpty && fioRegex.hasMatch(txt)) {
+                goodLabels.add(txt);
+              }
+            }
+
+            String? entry;
+            if (goodLabels.isNotEmpty) {
+              // склеиваем метки как на сайте (через ", "), не разделяем внутри
+              entry = goodLabels.join(', ');
+            } else {
+              // 2) иначе — берем весь текст ячейки, но только если там есть ФИО
+              final raw = teacherCell.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+              if (raw.isNotEmpty && fioRegex.hasMatch(raw)) {
+                entry = raw;
+              } else {
+                // дополнительная защита: иногда ФИО находятся внутри <strong> или <b> и окружающий текст ломает матч
+                final strong = teacherCell.querySelector('strong, b');
+                if (strong != null) {
+                  final s = strong.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+                  if (s.isNotEmpty && fioRegex.hasMatch(s)) {
+                    entry = s;
+                  }
+                }
+              }
+            }
+
+            if (entry != null && entry.trim().isNotEmpty) {
+              result.add(entry.trim());
+            }
+          }
+        }
+
+        // Сортировка по фамилии (последнее слово). Стабильная: затем по полной строке.
+        final list = result.toList();
+        list.sort((a, b) {
+          final ka = _surnameKey(a);
+          final kb = _surnameKey(b);
+          final c = ka.compareTo(kb);
+          return c != 0 ? c : a.compareTo(b);
+        });
+
+        for (var teacher in list){
+          teachers.add(TeacherInfo(teacherName: teacher));
+        }
+
+        await _saveCachedTeachers(teachers);
+
+        return teachers;
+      } else {
+        throw Exception(
+          'Ошибка при попытке получить страницу с расписанием!'
+        );
+      }
+
+    } catch (e) {
+      throw Exception(
+        'Ошибка при парсинге преподавателей'
+      );
+    }
+  }
+
+  /// Поиск индекса колонки с заголовком, содержащим "преподав"
+  int _findTeacherColumnIndex(Element table) {
+    // 1) Ищем в thead
+    final headerCells = <Element>[];
+    headerCells.addAll(table.querySelectorAll('thead th'));
+    // 2) если нет — попробуем первую строку tbody
+    if (headerCells.isEmpty) {
+      final firstRow = table.querySelector('tbody tr') ?? table.querySelector('tr');
+      if (firstRow != null) {
+        headerCells.addAll(firstRow.querySelectorAll('th'));
+      }
+    }
+    // 3) если всё ещё пусто — попробуем любые th в таблице
+    if (headerCells.isEmpty) {
+      headerCells.addAll(table.querySelectorAll('th'));
+    }
+
+    for (int i = 0; i < headerCells.length; i++) {
+      final text = headerCells[i].text.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+      if (text.contains('преподав')) return i;
+    }
+
+    return -1; // не найден
+  }
+
+  String _surnameKey(String s) {
+    final cleaned = s.replaceAll(RegExp(r'[,\.\(\)]'), '').trim();
+    final words = cleaned.split(RegExp(r'\s+'));
+    if (words.isEmpty) return cleaned.toLowerCase();
+    return words.last.toLowerCase();
+  }
+
+  Future<List<TeacherInfo>?> _getCachedTeachers() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = '${_cacheTeachersKey}all';
+      final timestampKey = '${_cacheTeachersTimestamp}all';
+      final timestamp = prefs.getInt(timestampKey);
+      final cachedJson = prefs.getString(cacheKey);
+
+      if (timestamp != null && cachedJson != null) {
+        final cacheTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+        final age = DateTime.now().difference(cacheTime);
+        
+        if (age < _cacheTtl) {
+          // Кэш действителен, возвращаем данные
+          final List<dynamic> decoded = jsonDecode(cachedJson);
+          return decoded.map((json) => TeacherInfo(
+            teacherName: json['teacherName'] as String,
+          )).toList();
+        } else {
+          // Кэш истек, очищаем устаревшие данные
+          await prefs.remove(cacheKey);
+          await prefs.remove(timestampKey);
+        }
+      }
+    } catch (e) {
+      // Игнорируем ошибки кэша
+    }
+    return null;
+  }
+
+  /// Сохраняет преподавателей в кэш
+  Future<void> _saveCachedTeachers(List<TeacherInfo> teachers) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = '${_cacheTeachersKey}all';
+      final timestampKey = '${_cacheTeachersTimestamp}all';
+      
+      final json = jsonEncode(teachers.map((teacher) => teacher.toJson()).toList());
+      await prefs.setString(cacheKey, json);
+      await prefs.setInt(timestampKey, DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      // Игнорируем ошибки кэша
+    }
+  }
+
   /// Парсит информацию о группе из текста заголовка
   ///
   /// Метод извлекает информацию о группе из текста заголовка и определяет
@@ -585,6 +788,8 @@ class MptParserService {
 
     return groups;
   }
+
+  
 
   /// Получает кэшированные группы
   Future<List<GroupInfo>?> _getCachedGroups(String? specialtyFilter) async {

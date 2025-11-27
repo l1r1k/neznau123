@@ -18,6 +18,7 @@ class PreloadService {
     try {
       // Загружаем все специальности (сохраняются в кэш автоматически)
       final specialties = await _parserService.parseTabList(forceRefresh: true);
+      final teachers = await _parserService.parseTeachers(forceRefresh: true);
       
       // Для каждой специальности загружаем группы (сохраняются в кэш автоматически)
       // Используем await для последовательной загрузки, чтобы не перегружать сервер

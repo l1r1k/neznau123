@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:my_mpt/data/services/schedule_parser_service.dart';
 import 'package:my_mpt/domain/entities/schedule.dart';
 import 'package:my_mpt/domain/repositories/schedule_repository_interface.dart';
@@ -7,6 +8,7 @@ class ScheduleParserRepository implements ScheduleRepositoryInterface {
   final ScheduleParserService _parserService = ScheduleParserService();
 
   static const String _selectedGroupKey = 'selected_group';
+  static const String _selectedTeacher = 'teacher';
 
   /// Получить расписание на неделю для конкретной группы
   @override
@@ -14,36 +16,66 @@ class ScheduleParserRepository implements ScheduleRepositoryInterface {
     try {
       // Здесь нужно получить выбранную группу из настроек
       final groupCode = await _getSelectedGroupCode();
+      final teacher = await _getTeacher();
 
-      if (groupCode.isEmpty) {
+      if (groupCode.isEmpty && teacher.isEmpty) {
         return {};
       }
 
-      final parsedSchedule = await _parserService.parseScheduleForGroup(
-        groupCode,
-      );
-
-      // Преобразуем Lesson в Schedule
-      final Map<String, List<Schedule>> weeklySchedule = {};
-
-      parsedSchedule.forEach((day, lessons) {
-        final List<Schedule> scheduleList = lessons.map((lesson) {
-          return Schedule(
-            id: '${day}_${lesson.number}',
-            number: lesson.number,
-            subject: lesson.subject,
-            teacher: lesson.teacher,
-            startTime: lesson.startTime,
-            endTime: lesson.endTime,
-            building: lesson.building,
-            lessonType: lesson.lessonType,
+      if (groupCode.isNotEmpty){
+          final parsedSchedule = await _parserService.parseScheduleForGroup(
+            groupCode,
           );
-        }).toList();
 
-        weeklySchedule[day] = scheduleList;
-      });
+          // Преобразуем Lesson в Schedule
+          final Map<String, List<Schedule>> weeklySchedule = {};
 
-      return weeklySchedule;
+          parsedSchedule!.forEach((day, lessons) {
+            final List<Schedule> scheduleList = lessons.map((lesson) {
+              return Schedule(
+                id: '${day}_${lesson.number}',
+                number: lesson.number,
+                subject: lesson.subject,
+                teacher: lesson.teacher ?? '',
+                startTime: lesson.startTime,
+                endTime: lesson.endTime,
+                building: lesson.building,
+                lessonType: lesson.lessonType,
+              );
+            }).toList();
+
+            weeklySchedule[day] = scheduleList;
+          });
+
+          return weeklySchedule;
+      } else {
+          final parsedSchedule = await _parserService.parseScheduleForTeacher(
+            teacher,
+          );
+
+          // Преобразуем Lesson в Schedule
+          final Map<String, List<Schedule>> weeklySchedule = {};
+
+          parsedSchedule!.forEach((day, lessons) {
+            final List<Schedule> scheduleList = lessons.map((lesson) {
+              return Schedule(
+                id: '${day}_${lesson.number}',
+                number: lesson.number,
+                subject: lesson.subject,
+                groupName: lesson.groupName ?? '',
+                startTime: lesson.startTime,
+                endTime: lesson.endTime,
+                building: lesson.building,
+                lessonType: lesson.lessonType,
+              );
+            }).toList();
+
+            weeklySchedule[day] = scheduleList;
+          });
+
+          return weeklySchedule;
+      }
+
     } catch (e) {
       return {};
     }
@@ -55,42 +87,76 @@ class ScheduleParserRepository implements ScheduleRepositoryInterface {
     try {
       // Здесь нужно получить выбранную группу из настроек
       final groupCode = await _getSelectedGroupCode();
+      final teacher = await _getTeacher();
 
-      if (groupCode.isEmpty) {
+      if (groupCode.isEmpty && teacher.isEmpty) {
         return [];
       }
 
-      final parsedSchedule = await _parserService.parseScheduleForGroup(
-        groupCode,
-      );
+      if (groupCode.isNotEmpty){
+        final parsedSchedule = await _parserService.parseScheduleForGroup(
+          groupCode,
+        );
 
-      // Получаем текущий день недели
-      final today = _getTodayInRussian();
+        // Получаем текущий день недели
+        final today = _getTodayInRussian();
 
-      // Показываем все доступные дни для отладки
-      // parsedSchedule.forEach((day, lessons) {
-      //   print('DEBUG: День в расписании: "$day", уроков: ${lessons.length}');
-      // });
+        // Показываем все доступные дни для отладки
+        // parsedSchedule.forEach((day, lessons) {
+        //   print('DEBUG: День в расписании: "$day", уроков: ${lessons.length}');
+        // });
 
-      if (parsedSchedule.containsKey(today)) {
-        final lessons = parsedSchedule[today]!;
+        if (parsedSchedule!.containsKey(today)) {
+          final lessons = parsedSchedule[today]!;
 
-        // Преобразуем Lesson в Schedule
-        return lessons.map((lesson) {
-          return Schedule(
-            id: '${today}_${lesson.number}',
-            number: lesson.number,
-            subject: lesson.subject,
-            teacher: lesson.teacher,
-            startTime: lesson.startTime,
-            endTime: lesson.endTime,
-            building: lesson.building,
-            lessonType: lesson.lessonType,
-          );
-        }).toList();
+          // Преобразуем Lesson в Schedule
+          return lessons.map((lesson) {
+            return Schedule(
+              id: '${today}_${lesson.number}',
+              number: lesson.number,
+              subject: lesson.subject,
+              teacher: lesson.teacher,
+              startTime: lesson.startTime,
+              endTime: lesson.endTime,
+              building: lesson.building,
+              lessonType: lesson.lessonType,
+            );
+          }).toList();
+        }
+        return [];
+      } else {
+        final parsedSchedule = await _parserService.parseScheduleForTeacher(
+          teacher,
+        );
+
+        // Получаем текущий день недели
+        final today = _getTodayInRussian();
+
+        // Показываем все доступные дни для отладки
+        // parsedSchedule.forEach((day, lessons) {
+        //   print('DEBUG: День в расписании: "$day", уроков: ${lessons.length}');
+        // });
+
+        if (parsedSchedule!.containsKey(today)) {
+          final lessons = parsedSchedule[today]!;
+
+          // Преобразуем Lesson в Schedule
+          return lessons.map((lesson) {
+            return Schedule(
+              id: '${today}_${lesson.number}',
+              number: lesson.number,
+              subject: lesson.subject,
+              groupName: lesson.groupName,
+              startTime: lesson.startTime,
+              endTime: lesson.endTime,
+              building: lesson.building,
+              lessonType: lesson.lessonType,
+            );
+          }).toList();
+        }
+
+        return [];
       }
-
-      return [];
     } catch (e) {
       return [];
     }
@@ -102,42 +168,77 @@ class ScheduleParserRepository implements ScheduleRepositoryInterface {
     try {
       // Здесь нужно получить выбранную группу из настроек
       final groupCode = await _getSelectedGroupCode();
+      final teacher = await _getTeacher();
 
-      if (groupCode.isEmpty) {
+      if (groupCode.isEmpty && teacher.isEmpty) {
         return [];
       }
 
-      final parsedSchedule = await _parserService.parseScheduleForGroup(
-        groupCode,
-      );
+      if (groupCode.isNotEmpty) {
+        final parsedSchedule = await _parserService.parseScheduleForGroup(
+          groupCode,
+        );
 
-      // Получаем завтрашний день недели
-      final tomorrow = _getTomorrowInRussian();
+        // Получаем завтрашний день недели
+        final tomorrow = _getTomorrowInRussian();
 
-      // Показываем все доступные дни для отладки
-      // parsedSchedule.forEach((day, lessons) {
-      //   print('DEBUG: День в расписании: "$day", уроков: ${lessons.length}');
-      // });
+        // Показываем все доступные дни для отладки
+        // parsedSchedule.forEach((day, lessons) {
+        //   print('DEBUG: День в расписании: "$day", уроков: ${lessons.length}');
+        // });
 
-      if (parsedSchedule.containsKey(tomorrow)) {
-        final lessons = parsedSchedule[tomorrow]!;
+        if (parsedSchedule!.containsKey(tomorrow)) {
+          final lessons = parsedSchedule[tomorrow]!;
 
-        // Преобразуем Lesson в Schedule
-        return lessons.map((lesson) {
-          return Schedule(
-            id: '${tomorrow}_${lesson.number}',
-            number: lesson.number,
-            subject: lesson.subject,
-            teacher: lesson.teacher,
-            startTime: lesson.startTime,
-            endTime: lesson.endTime,
-            building: lesson.building,
-            lessonType: lesson.lessonType,
-          );
-        }).toList();
+          // Преобразуем Lesson в Schedule
+          return lessons.map((lesson) {
+            return Schedule(
+              id: '${tomorrow}_${lesson.number}',
+              number: lesson.number,
+              subject: lesson.subject,
+              teacher: lesson.teacher,
+              startTime: lesson.startTime,
+              endTime: lesson.endTime,
+              building: lesson.building,
+              lessonType: lesson.lessonType,
+            );
+          }).toList();
+        }
+
+        return [];
+      } else {
+        final parsedSchedule = await _parserService.parseScheduleForTeacher(
+          teacher,
+        );
+
+        // Получаем завтрашний день недели
+        final tomorrow = _getTomorrowInRussian();
+
+        // Показываем все доступные дни для отладки
+        // parsedSchedule.forEach((day, lessons) {
+        //   print('DEBUG: День в расписании: "$day", уроков: ${lessons.length}');
+        // });
+
+        if (parsedSchedule!.containsKey(tomorrow)) {
+          final lessons = parsedSchedule[tomorrow]!;
+
+          // Преобразуем Lesson в Schedule
+          return lessons.map((lesson) {
+            return Schedule(
+              id: '${tomorrow}_${lesson.number}',
+              number: lesson.number,
+              subject: lesson.subject,
+              groupName: lesson.groupName,
+              startTime: lesson.startTime,
+              endTime: lesson.endTime,
+              building: lesson.building,
+              lessonType: lesson.lessonType,
+            );
+          }).toList();
+        }
+
+        return [];
       }
-
-      return [];
     } catch (e) {
       return [];
     }
@@ -155,6 +256,22 @@ class ScheduleParserRepository implements ScheduleRepositoryInterface {
       // Если переменная окружения не задана, используем SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       return prefs.getString(_selectedGroupKey) ?? '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  Future<String> _getTeacher() async {
+    try {
+      // Проверяем переменную окружения first
+      const envTeacher = String.fromEnvironment('TEACHER');
+      if (envTeacher.isNotEmpty) {
+        return envTeacher;
+      }
+
+      // Если переменная окружения не задана, используем SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_selectedTeacher) ?? '';
     } catch (e) {
       return '';
     }

@@ -5,14 +5,16 @@ import 'package:my_mpt/data/parsers/schedule_html_parser.dart';
 class ScheduleParserService {
   ScheduleParserService({
     ScheduleRemoteDataSource? remoteDataSource,
-    ScheduleHtmlParser? htmlParser,
+    ScheduleTeacherParser? htmlTeacherParser,
+    ScheduleGroupParser? htmlGroupParser
   })  : _remoteDataSource = remoteDataSource ?? ScheduleRemoteDataSource(),
-        _htmlParser = htmlParser ?? ScheduleHtmlParser();
+        _htmlTeacherParser = htmlTeacherParser ?? ScheduleTeacherParser(),
+        _htmlGroupParser = htmlGroupParser ?? ScheduleGroupParser();
 
   final ScheduleRemoteDataSource _remoteDataSource;
-  final ScheduleHtmlParser _htmlParser;
+  final ScheduleTeacherParser _htmlTeacherParser;
+  final ScheduleGroupParser _htmlGroupParser;
 
-  /// Парсит расписание для конкретной группы
   Future<Map<String, List<Lesson>>> parseScheduleForGroup(
     String groupCode, {
     bool forceRefresh = false,
@@ -23,9 +25,26 @@ class ScheduleParserService {
       final html = await _remoteDataSource.fetchSchedulePage(
         forceRefresh: forceRefresh,
       );
-      return _htmlParser.parse(html, groupCode);
+      return _htmlGroupParser.parseHTML(html, groupCode);
     } catch (error) {
       throw Exception('Error parsing schedule for group $groupCode: $error');
+    }
+  }
+
+  /// Парсит расписание для конкретного преподавателя
+  Future<Map<String, List<Lesson>>?> parseScheduleForTeacher(
+    String teacherName, {
+    bool forceRefresh = false,
+  }) async {
+    if (teacherName.isEmpty) return {};
+
+    try {
+      final html = await _remoteDataSource.fetchSchedulePage(
+        forceRefresh: forceRefresh,
+      );
+      return _htmlTeacherParser.parseHTML(html, teacherName);
+    } catch (error) {
+      throw Exception('Error parsing schedule for group $teacherName: $error');
     }
   }
 

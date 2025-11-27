@@ -469,7 +469,7 @@ class _DaySection extends StatelessWidget {
             LessonCard(
               number: lesson.number,
               subject: lesson.subject,
-              teacher: lesson.teacher,
+              groupName: lesson.groupName ?? lesson.teacher ?? '',
               startTime: startTime,
               endTime: endTime,
               accentColor: accentColor,
@@ -515,7 +515,7 @@ class _DaySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final formattedTitle = _formatDayTitle(title);
+    final formattedTitle = _formatDayTitle(title.split(' ')[0]);
 
     final callsData = CallsService.getCalls();
 

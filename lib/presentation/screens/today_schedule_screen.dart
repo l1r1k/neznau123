@@ -343,7 +343,7 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
                             LessonCard(
                               number: item.number,
                               subject: item.subject,
-                              teacher: item.teacher,
+                              groupName: item.groupName ?? item.teacher ?? '',
                               startTime: lessonStartTime,
                               endTime: lessonEndTime,
                               accentColor: _lessonAccent,
@@ -573,7 +573,7 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
           id: existing.id,
           number: existing.number,
           subject: subject,
-          teacher: teacher.isNotEmpty ? teacher : existing.teacher,
+          groupName: teacher.isNotEmpty ? teacher : existing.groupName,
           startTime: existing.startTime,
           endTime: existing.endTime,
           building: updatedBuilding.isNotEmpty
@@ -588,7 +588,7 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
             id: 'change_${lessonNumber}_${change.updatedAt}',
             number: lessonNumber,
             subject: subject,
-            teacher: teacher,
+            groupName: teacher,
             startTime: timing.start,
             endTime: timing.end,
             building: updatedBuilding.isNotEmpty

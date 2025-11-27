@@ -3,6 +3,7 @@ import 'package:my_mpt/data/models/tab_info.dart';
 import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
 import 'package:my_mpt/domain/entities/specialty.dart';
 import 'package:my_mpt/domain/entities/group.dart';
+import 'package:my_mpt/domain/entities/teacher.dart';
 
 class MptRepository implements SpecialtyRepositoryInterface {
   final MptParserService _parserService = MptParserService();
@@ -10,6 +11,7 @@ class MptRepository implements SpecialtyRepositoryInterface {
   // Кэш для маппинга код -> имя специальности
   Map<String, String>? _codeToNameCache;
   List<Specialty>? _cachedSpecialties;
+  List<Teacher>? _cachedTeachers;
 
   @override
   Future<List<Specialty>> getSpecialties() async {
@@ -81,6 +83,28 @@ class MptRepository implements SpecialtyRepositoryInterface {
 
       return result;
     } catch (e) {
+      return [];
+    }
+  }
+
+  @override
+  Future<List<Teacher>> getTeachers() async{
+    try{
+      if (_cachedTeachers != null) {
+        return _cachedTeachers!;
+      }
+
+      final teacherInfos = await _parserService.parseTeachers();
+      final teachers = teacherInfos
+          .map(
+            (teacherInfo) => Teacher(
+              teacherName: teacherInfo.teacherName
+              ),
+          )
+          .toList();
+      _cachedTeachers = teachers;
+      return teachers;
+    } catch (e){
       return [];
     }
   }

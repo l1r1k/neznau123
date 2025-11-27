@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:my_mpt/domain/entities/specialty.dart';
 import 'package:my_mpt/domain/entities/group.dart';
+import 'package:my_mpt/domain/entities/teacher.dart';
 import 'package:my_mpt/domain/usecases/get_specialties_usecase.dart';
 import 'package:my_mpt/domain/usecases/get_groups_by_specialty_usecase.dart';
 import 'package:my_mpt/domain/repositories/specialty_repository_interface.dart';
 import 'package:my_mpt/data/repositories/mpt_repository.dart' as repo_impl;
 import 'package:my_mpt/data/repositories/unified_schedule_repository.dart';
+import 'package:my_mpt/domain/usecases/get_teacher_usecase.dart';
 import 'package:my_mpt/presentation/widgets/success_notification.dart';
 import 'package:my_mpt/presentation/widgets/error_notification.dart';
 import 'package:my_mpt/presentation/widgets/info_notification.dart';
@@ -29,11 +31,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late SpecialtyRepositoryInterface _repository;
   late GetSpecialtiesUseCase _getSpecialtiesUseCase;
   late GetGroupsBySpecialtyUseCase _getGroupsBySpecialtyUseCase;
+  late GetTeachersUseCase _getTeachersUseCase;
   List<Specialty> _specialties = [];
   List<Group> _groups = [];
+  List<Teacher> _teachers = [];
   Specialty? _selectedSpecialty;
   Group? _selectedGroup;
   String? _selectedSpecialtyCode;
+  Teacher? _selectedTeacher;
+  String? _selectedRole;
   bool _isLoading = false;
   bool _isRefreshing = false;
   StateSetter? _modalStateSetter;
@@ -41,6 +47,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   static const String _selectedGroupKey = 'selected_group';
   static const String _selectedSpecialtyKey = 'selected_specialty';
+  static const String _teacherNameKey = 'teacher';
+  static const String _selectedRoleKey = 'selected_role';
 
   @override
   void initState() {
@@ -48,7 +56,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _repository = repo_impl.MptRepository();
     _getSpecialtiesUseCase = GetSpecialtiesUseCase(_repository);
     _getGroupsBySpecialtyUseCase = GetGroupsBySpecialtyUseCase(_repository);
+    _getTeachersUseCase = GetTeachersUseCase(_repository);
     _loadSpecialties();
+    _loadTeachers();
     _loadSelectedPreferences();
   }
 
@@ -82,62 +92,92 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSelectedPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final selectedGroupCode = prefs.getString(_selectedGroupKey);
-      final selectedSpecialtyCode = prefs.getString(_selectedSpecialtyKey);
-      final selectedSpecialtyName = prefs.getString(
-        '${_selectedSpecialtyKey}_name',
-      );
-      // Загружаем время последнего обновления
-      final lastUpdateMillis = prefs.getString('last_schedule_update');
-      if (lastUpdateMillis != null && lastUpdateMillis.isNotEmpty) {
-        try {
-          // Проверяем, является ли строка числом (новый формат)
-          if (RegExp(r'^\d+$').hasMatch(lastUpdateMillis)) {
-            _lastUpdate = DateTime.fromMillisecondsSinceEpoch(
-              int.parse(lastUpdateMillis),
-            );
-          } else {
-            // Старый формат - игнорируем
-          }
-        } catch (e) {}
-      }
+      final selectedRoleLoaded = prefs.getString(_selectedRoleKey);
 
-      setState(() {
-        if (selectedGroupCode != null && selectedGroupCode.isNotEmpty) {
-          // Устанавливаем выбранную группу, она будет проверена в _loadGroups
-          _selectedGroup = Group(code: selectedGroupCode, specialtyCode: '');
+      if (selectedRoleLoaded == 'student'){
+        final selectedGroupCode = prefs.getString(_selectedGroupKey);
+        final selectedSpecialtyCode = prefs.getString(_selectedSpecialtyKey);
+        final selectedSpecialtyName = prefs.getString(
+          '${_selectedSpecialtyKey}_name',
+        );
+        // Загружаем время последнего обновления
+        final lastUpdateMillis = prefs.getString('last_schedule_update');
+        if (lastUpdateMillis != null && lastUpdateMillis.isNotEmpty) {
+          try {
+            // Проверяем, является ли строка числом (новый формат)
+            if (RegExp(r'^\d+$').hasMatch(lastUpdateMillis)) {
+              _lastUpdate = DateTime.fromMillisecondsSinceEpoch(
+                int.parse(lastUpdateMillis),
+              );
+            } else {
+              // Старый формат - игнорируем
+            }
+          } catch (e) {}
         }
 
-        if (selectedSpecialtyCode != null && selectedSpecialtyCode.isNotEmpty) {
-          _selectedSpecialtyCode = selectedSpecialtyCode;
+        setState(() {
+          if (selectedRoleLoaded != null && selectedRoleLoaded.isNotEmpty){
+            _selectedRole = selectedRoleLoaded;
+          }
 
-          if (selectedSpecialtyName != null &&
-              selectedSpecialtyName.isNotEmpty) {
-            _selectedSpecialty = Specialty(
-              code: selectedSpecialtyCode,
-              name: selectedSpecialtyName,
-            );
-          } else if (_specialties.isNotEmpty) {
-            final selectedSpecialty = _specialties.firstWhere(
-              (specialty) => specialty.code == selectedSpecialtyCode,
-              orElse: () => Specialty(code: '', name: ''),
-            );
+          if (selectedGroupCode != null && selectedGroupCode.isNotEmpty) {
+            // Устанавливаем выбранную группу, она будет проверена в _loadGroups
+            _selectedGroup = Group(code: selectedGroupCode, specialtyCode: '');
+          }
 
-            if (selectedSpecialty.code.isNotEmpty) {
-              _selectedSpecialty = selectedSpecialty;
+          if (selectedSpecialtyCode != null && selectedSpecialtyCode.isNotEmpty) {
+            _selectedSpecialtyCode = selectedSpecialtyCode;
+
+            if (selectedSpecialtyName != null &&
+                selectedSpecialtyName.isNotEmpty) {
+              _selectedSpecialty = Specialty(
+                code: selectedSpecialtyCode,
+                name: selectedSpecialtyName,
+              );
+            } else if (_specialties.isNotEmpty) {
+              final selectedSpecialty = _specialties.firstWhere(
+                (specialty) => specialty.code == selectedSpecialtyCode,
+                orElse: () => Specialty(code: '', name: ''),
+              );
+
+              if (selectedSpecialty.code.isNotEmpty) {
+                _selectedSpecialty = selectedSpecialty;
+              }
+            }
+
+            // Загружаем группы для выбранной специальности
+            if (_selectedSpecialty != null &&
+                _selectedSpecialty!.code.isNotEmpty) {
+              // Добавляем небольшую задержку для корректной инициализации
+              Future.delayed(const Duration(milliseconds: 100), () {
+                _loadGroups(_selectedSpecialty!.code);
+              });
             }
           }
-
-          // Загружаем группы для выбранной специальности
-          if (_selectedSpecialty != null &&
-              _selectedSpecialty!.code.isNotEmpty) {
-            // Добавляем небольшую задержку для корректной инициализации
-            Future.delayed(const Duration(milliseconds: 100), () {
-              _loadGroups(_selectedSpecialty!.code);
-            });
-          }
+        });
+      } else {
+        final teacher = prefs.getString(_teacherNameKey);
+        final lastUpdateMillis = prefs.getString('last_schedule_update');
+        if (lastUpdateMillis != null && lastUpdateMillis.isNotEmpty) {
+          try {
+            // Проверяем, является ли строка числом (новый формат)
+            if (RegExp(r'^\d+$').hasMatch(lastUpdateMillis)) {
+              _lastUpdate = DateTime.fromMillisecondsSinceEpoch(
+                int.parse(lastUpdateMillis),
+              );
+            } else {
+              // Старый формат - игнорируем
+            }
+          } catch (e) {}
         }
-      });
+
+        setState(() {
+          _selectedTeacher = Teacher(teacherName: teacher ?? '');
+          Future.delayed(const Duration(microseconds: 100), () async {
+            _loadTeachers();
+          });
+        });
+      }
     } catch (e) {}
   }
 
@@ -253,6 +293,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _changeVersion() async {
+    try {
+      // Проверяем, выбрана ли группа
+      final prefs = await SharedPreferences.getInstance();
+      final selectedRole = prefs.getString(_selectedRoleKey);
+      String fromToChange = '';
+
+      if (selectedRole == 'student'){
+        await prefs.setString(_selectedRoleKey, 'teacher');
+        await prefs.setString(_selectedGroupKey, '');
+        await prefs.setString(_selectedSpecialtyKey, '');
+        _selectedGroup = null;
+        _selectedSpecialty = null;
+        _selectedRole = 'teacher';
+        fromToChange = 'Версия успешно изменена со студента на преподавателя';
+      } else {
+        await prefs.setString(_selectedRoleKey, 'student');
+        await prefs.setString(_teacherNameKey, '');
+        _selectedTeacher = null;
+        _selectedRole = 'student';
+        fromToChange = 'Версия успешно изменена с преподавателя на студента';
+      }
+
+      setState(() {
+        
+      });
+
+      if (context.mounted) {
+        showSuccessNotification(
+          context,
+          'Версия изменена',
+          fromToChange,
+          Icons.check_circle_outline,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showErrorNotification(
+          context,
+          'Ошибка сменые версии',
+          'Не удалось сменить версию',
+          Icons.error_outline,
+        );
+      }
+    }
+  }
+
   Future<void> _loadGroups(String specialtyCode) async {
     setState(() {
       _isLoading = true;
@@ -326,6 +413,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _loadTeachers() async {
+    setState(() {
+      _isLoading = true;
+      _teachers = [];
+    });
+
+    try {
+      // Добавляем таймаут для предотвращения бесконечной загрузки
+      final teachers = await _getTeachersUseCase().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Превышено время ожидания загрузки преподавателей');
+        },
+      );
+
+      // Загружаем выбранную группу, если она была сохранена
+      Teacher? selectedTeacher;
+      if (_selectedTeacher != null) {
+        // Проверяем, существует ли выбранная группа в новом списке
+        selectedTeacher = teachers.firstWhere(
+          (teacher) => teacher.teacherName == _selectedTeacher!.teacherName,
+          orElse: () => Teacher(teacherName: ''),
+        );
+
+        // Если группа не найдена, сбрасываем выбор
+        if (selectedTeacher.teacherName.isEmpty) {
+          selectedTeacher = null;
+        }
+      } else {
+        // Проверяем, есть ли сохраненная группа в настройках
+        final prefs = await SharedPreferences.getInstance();
+        final savedTeacherName = prefs.getString(_teacherNameKey);
+        if (savedTeacherName != null && savedTeacherName.isNotEmpty) {
+          selectedTeacher = teachers.firstWhere(
+            (teacher) => teacher.teacherName == savedTeacherName,
+            orElse: () => Teacher(teacherName: ''),
+          );
+
+          // Если группа не найдена, сбрасываем выбор
+          if (selectedTeacher.teacherName.isEmpty) {
+            selectedTeacher = null;
+          }
+        }
+      }
+
+      setState(() {
+        _teachers = teachers;
+        _isLoading = false;
+        // Обновляем выбранную группу только если она существует в новом списке
+        if (selectedTeacher != null) {
+          _selectedTeacher = selectedTeacher;
+        }
+      });
+
+      // Force refresh the UI
+      setState(() {});
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error appropriately
+      if (context.mounted) {
+        showErrorNotification(
+          context,
+          'Ошибка загрузки',
+          'Не удалось загрузить преподавателей. Попробуйте еще раз.',
+          Icons.error_outline,
+        );
+      }
+    }
+  }
+
   void _onSpecialtySelected(Specialty specialty) async {
     setState(() {
       _selectedSpecialty = specialty;
@@ -381,6 +540,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _onTeacherSelected(Teacher teacher) async {
+    setState(() {
+      _selectedTeacher = teacher;
+    });
+
+    try{
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_teacherNameKey, teacher.teacherName);
+    } catch (e){}
+
+    try {
+      final repository = UnifiedScheduleRepository();
+      await repository.forceRefresh();
+
+      // Show confirmation
+      if (context.mounted) {
+        showSuccessNotification(
+          context,
+          'Преподаватель выбран',
+          '${teacher.teacherName} • Расписание обновлено',
+          Icons.check_circle_outline,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showErrorNotification(
+          context,
+          'Преподаватель выбран',
+          '${teacher.teacherName} • Ошибка обновления расписания',
+          Icons.warning_amber_rounded,
+        );
+      }
+    }
+  }
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -393,23 +587,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const _SettingsHeader(),
               const SizedBox(height: 28),
-              const _Section(title: 'Учебная группа'),
-              const SizedBox(height: 14),
-              _SettingsCard(
-                title: 'Выберите свою специальность',
-                subtitle:
-                    _selectedSpecialty?.name ?? 'Специальность не выбрана',
-                icon: Icons.book_outlined,
-                onTap: _showSpecialtySelector,
-              ),
-              const SizedBox(height: 14),
-              _SettingsCard(
-                title: 'Выберите свою группу',
-                subtitle: _selectedGroup?.code ?? 'Группа не выбрана',
-                icon: Icons.school_outlined,
-                onTap: _selectedSpecialty != null ? _showGroupSelector : null,
-              ),
-              const SizedBox(height: 28),
+              if (_selectedRole == 'student') ...[
+                const _Section(title: 'Учебная группа'),
+                const SizedBox(height: 14),
+                _SettingsCard(
+                  title: 'Выберите свою специальность',
+                  subtitle:
+                      _selectedSpecialty?.name ?? 'Специальность не выбрана',
+                  icon: Icons.book_outlined,
+                  onTap: _showSpecialtySelector,
+                ),
+                const SizedBox(height: 14),
+                _SettingsCard(
+                  title: 'Выберите свою группу',
+                  subtitle: _selectedGroup?.code ?? 'Группа не выбрана',
+                  icon: Icons.school_outlined,
+                  onTap: _selectedSpecialty != null ? _showGroupSelector : null,
+                ),
+                const SizedBox(height: 14),
+                _SettingsCard(
+                  title: 'Сменить версию',
+                  subtitle: 'Изменить версию приложения на преподавателя, для просмотра расписания пар',
+                  icon: Icons.change_circle_outlined,
+                  onTap: _changeVersion,
+                  isRefreshing: _isRefreshing,
+                ),
+                const SizedBox(height: 28),
+              ] else ... [
+                const _Section(title: 'Преподаватель'),
+                const SizedBox(height: 14),
+                _SettingsCard(
+                  title: 'Выберите преподавателя',
+                  subtitle:
+                      _selectedTeacher?.teacherName ?? 'Преподаватель не выбран',
+                  icon: Icons.school_outlined,
+                  onTap: _showTeacherSelector,
+                ),
+                const SizedBox(height: 14),
+                _SettingsCard(
+                  title: 'Сменить версию',
+                  subtitle: 'Изменить версию приложения на студента, для просмотра расписания группы',
+                  icon: Icons.change_circle_outlined,
+                  onTap: _changeVersion,
+                  isRefreshing: _isRefreshing,
+                ),
+                const SizedBox(height: 28),
+              ],
               const _Section(title: 'Расписание'),
               const SizedBox(height: 14),
               _SettingsCard(
@@ -478,7 +701,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Мой МПТ - Мобильное приложение для студентов Московского приборостроительного техникума, позволяющее просматривать расписание занятий, звонки и другую полезную информацию.',
+                  'Форк приложения "Мой МПТ" - Мобильное приложение для студентов и преподавателей Московского приборостроительного техникума, позволяющее просматривать расписание занятий, звонки и другую полезную информацию.',
                   style: TextStyle(
                     color: Colors.white70,
                     fontWeight: FontWeight.w600,
@@ -509,7 +732,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
+                  'Форк разработал:',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Преподаватель МПТ:',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '• Перевалов Кирилл Александрович',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 16),
+                const Text(
                   'Версия: 0.1.1',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Версия форка: 0.0.0',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -676,6 +925,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onTap: () {
                                   Navigator.pop(context);
                                   _onGroupSelected(group);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showTeacherSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            // Сохраняем StateSetter для обновления состояния модального окна
+            _modalStateSetter = setModalState;
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.6,
+              decoration: const BoxDecoration(
+                color: Color(0xFF111111),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.all(16),
+                    height: 4,
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Выберите преподавателя',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
+                          )
+                        : _teachers.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'Преподаватели не найдены',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: _teachers.length,
+                            itemBuilder: (context, index) {
+                              final teacher = _teachers[index];
+                              return ListTile(
+                                title: Text(
+                                  teacher.teacherName,
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _onTeacherSelected(teacher);
                                 },
                               );
                             },
