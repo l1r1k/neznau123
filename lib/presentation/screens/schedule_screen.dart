@@ -86,7 +86,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   /// Обработчик уведомлений об обновлении данных
   void _onDataUpdated() {
-    _loadScheduleData(forceRefresh: false, showLoader: false);
+    _loadScheduleData(forceRefresh: true, showLoader: false);
   }
 
   /// Загрузка данных расписания

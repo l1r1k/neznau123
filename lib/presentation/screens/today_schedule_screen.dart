@@ -101,8 +101,8 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
       }
 
       final scheduleResults = await Future.wait([
-        _getTodayScheduleUseCase(),
-        _getTomorrowScheduleUseCase(),
+        _getTodayScheduleUseCase(forceRefresh: true),
+        _getTomorrowScheduleUseCase(forceRefresh: true),
       ]);
 
       if (!mounted) return;
