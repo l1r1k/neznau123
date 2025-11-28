@@ -181,10 +181,51 @@ class ScheduleChangesService {
     }
   }
 
-   /// Основная функция парсинга всех изменений для конкретного преподавателя
-  Future<List<ScheduleChange>> parseChanges(String teacherName, {bool forceRefresh = false, }) async {
+/// Нормализация: NBSP -> space, сжатие пробелов, trim
+String normalize(String s) {
+  return s.replaceAll('\u00A0', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+/// Проверка, входит ли имя преподавателя в ячейку (с нормализацией и запасной логикой)
+bool containsTeacher(String cellText, String teacher) {
+  if (cellText.isEmpty) return false;
+  final normCell = normalize(cellText).toLowerCase();
+  final normTeacher = normalize(teacher).toLowerCase();
+
+  if (normCell.contains(normTeacher)) return true;
+
+  // Дополнительная логика: если teacher в формате "И.О. Фамилия", попробуем искать по фамилии
+  final fioRe = RegExp(r'([А-ЯЁA-Z]\.[А-ЯЁA-Z]\.)\s*([А-ЯЁа-яёA-Za-z\-]+)');
+  final m = fioRe.firstMatch(normTeacher);
+  if (m != null) {
+    final surname = m.group(2)!.toLowerCase();
+    if (surname.isNotEmpty && normCell.contains(surname)) return true;
+  } else {
+    // иначе ищем по последнему слову teacher
+    final parts = normTeacher.split(' ');
+    if (parts.isNotEmpty) {
+      final surname = parts.last.toLowerCase();
+      if (surname.isNotEmpty && normCell.contains(surname)) return true;
+    }
+  }
+
+  return false;
+}
+
+/// Извлекает дату из h4: ищем <b>...</b>, если нет — берём весь текст h4 и нормализуем
+String extractDateFromH4(Element h4) {
+  final b = h4.querySelector('b');
+  if (b != null) {
+    final txt = normalize(b.text);
+    if (txt.isNotEmpty) return txt;
+  }
+  return normalize(h4.text);
+}
+
+Future<List<ScheduleChange>> parseScheduleChangesForTeacher(String teacherName, {
+    bool forceRefresh = false,
+  }) async {
     try{
-      // Проверяем кэш
       if (!forceRefresh) {
         final cachedChanges = await _getCachedChanges(teacherName: teacherName);
         if (cachedChanges != null) {
@@ -192,7 +233,6 @@ class ScheduleChangesService {
         }
       }
 
-      // Отправляем HTTP-запрос к странице изменений в расписании
       final response = await http
           .get(Uri.parse(baseUrl))
           .timeout(
@@ -205,120 +245,88 @@ class ScheduleChangesService {
           );
 
       if (response.statusCode == 200){
-      final document = parser.parse(response.body);
-      final result = <String, List<ScheduleChange>>{};
+          final Document doc = parser.parse(response.body);
+          final List<ScheduleChange> results = [];
 
-      // Все блоки-дней вида <h4>Дата</h4> + <table>...</table>
-      final h4s = document.querySelectorAll("h4");
+          String? currentDate;
 
-      // Считываем время последнего обновления HTML
-      final updatedText = document.querySelector("p.text-muted")?.text ?? "";
-      final updatedAt = _parseUpdatedAt(updatedText);
+          // получаем ВСЕ теги документа в правильном порядке
+          final allElements = doc.body!.querySelectorAll('*');
 
-      for (var h4 in h4s) {
-        final dateStr = h4.text.trim();
-        final changeDate = _parseDate(dateStr);
+          for (var element in allElements) {
+            // 1) Определяем дату замен
+            if (element.localName == 'h4' && element.text.contains('Замены')) {
+              final b = element.querySelector('b');
+              if (b != null) {
+                currentDate = normalize(b.text);
+              } else {
+                currentDate = normalize(element.text);
+              }
+              continue;
+            }
 
-        // Находим таблицу сразу после h4
-        final table = h4.nextElementSibling;
-        if (table == null || table.localName != "table") continue;
+            // если дата не определена — таблицы игнорируем
+            if (currentDate == null) continue;
 
-        final rows = table.querySelectorAll("tbody tr");
-        for (var row in rows) {
-          final cols = row.querySelectorAll("td");
-          if (cols.length < 3) continue;
+            // 2) Если нашли таблицу — обрабатываем
+            if (element.localName == 'table') {
+              // 2.1 Получаем группу из caption, если есть
+              final caption = element.querySelector('caption');
+              if (caption == null) continue; // таблица без группы — не замены
 
-          final number = int.tryParse(cols[0].text.trim());
-          if (number == null) continue;
+              String groupName = normalize(
+                caption.text.replaceAll('Группа', '').replaceAll(':', '')
+              );
 
-          final fromHtml = cols[1];
-          final toHtml = cols[2];
+              // 2.2 Обрабатываем строки таблицы
+              final rows = element.querySelectorAll('tr');
 
-          final replaceFrom = _cleanCell(fromHtml);
-          final replaceTo = _cleanCell(toHtml);
+              for (var row in rows) {
+                final cells = row.querySelectorAll('td');
+                if (cells.length != 4) continue;   // пропускаем заголовок
 
-          // Собираем преподавателей
-          final teachers = _extractTeachers(fromHtml) + _extractTeachers(toHtml);
-          if (teachers.isEmpty) continue;
+                final lessonNumber = int.tryParse(normalize(cells[0].text));
+                if (lessonNumber == null) continue;
 
-          for (var teacher in teachers) {
-            result.putIfAbsent(teacher, () => []);
-            result[teacher]!.add(
-              ScheduleChange(
-                lessonNumber: number.toString(),
-                replaceFrom: replaceFrom,
-                replaceTo: replaceTo,
-                updatedAt: updatedAt.toString(),
-                changeDate: changeDate.toString(),
-              ),
-            );
+                final replaceFrom = normalize(cells[1].text);
+                final replaceTo   = normalize(cells[2].text);
+                final updatedAt   = normalize(cells[3].text);
+
+                // проверяем принадлежность преподавателя
+                final inFrom = containsTeacher(replaceFrom, teacherName);
+                final inTo   = containsTeacher(replaceTo, teacherName);
+
+                if (!inFrom && !inTo) continue;
+
+                final role = inFrom && inTo
+                    ? 'both'
+                    : inFrom ? 'from' : 'to';
+
+                results.add(ScheduleChange(
+                  lessonNumber: lessonNumber.toString(),
+                  group: groupName,
+                  replaceFrom: replaceFrom,
+                  replaceTo: replaceTo,
+                  updatedAt: updatedAt,
+                  changeDate: currentDate!,
+                  role: role,
+                ));
+              }
+            }
           }
-        }
+          await _saveCachedChanges(results, teacherName: teacherName);
+          return results;
+      } else{
+        throw Exception(
+          'Не удалось загрузить страницу'
+        );
       }
-
-      await _saveCachedChanges(result[teacherName]!, teacherName: teacherName);
-
-      return result[teacherName]!;
-      } else {
-        throw Exception('Ошибка при попытке получить страницу изменения в расписании!');
-      }
+    } catch (e){
+      throw Exception(
+        'Ошибка получения изменения в расписании'
+      );
     }
-    catch (e){
-      throw Exception('Ошибка при попытке получить изменения в расписании у преподавателя!');
-    }
-  }
-
-  // Извлекает текст предмета/состояния пары (с учётом отмен/пустых пар)
-  String _cleanCell(Element td) {
-    // Если в ячейке есть <span class="label-danger">Отмена</span>
-    final cancel = td.querySelector(".label-danger");
-    if (cancel != null) return cancel.text.trim();
-
-    // Например: "Свободно", "—", пустая строка
-    final text = td.text.trim();
-    if (text.isEmpty || text == "-" || text == "—") {
-      return "Нет пары";
-    }
-
-    return text.replaceAll(RegExp(r"\s+"), " ").trim();
-  }
-
-  // Достаёт преподавателей из ячейки
-  List<String> _extractTeachers(Element td) {
-    final raw = td.text;
-    final matches = RegExp(r"[А-ЯЁA-Z]\.[А-ЯЁA-Z]\.\s?[А-ЯЁA-Z][а-яёa-z]+")
-        .allMatches(raw);
-
-    return matches.map((m) => m.group(0)!.trim()).toSet().toList();
-  }
-
-  DateTime _parseDate(String s) {
-    // Формат в Changes: "18.11.2022"
-    final parts = s.split(".");
-    if (parts.length == 3) {
-      final d = int.tryParse(parts[0]) ?? 1;
-      final m = int.tryParse(parts[1]) ?? 1;
-      final y = int.tryParse(parts[2]) ?? 2020;
-      return DateTime(y, m, d);
-    }
-    return DateTime.now();
-  }
-
-  DateTime _parseUpdatedAt(String text) {
-    // пример: "Последнее обновление: 17.11.2022 19:14"
-    final match = RegExp(r"(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2})")
-        .firstMatch(text);
-
-    if (match == null) return DateTime.now();
-
-    final d = int.parse(match.group(1)!);
-    final m = int.parse(match.group(2)!);
-    final y = int.parse(match.group(3)!);
-    final h = int.parse(match.group(4)!);
-    final min = int.parse(match.group(5)!);
-
-    return DateTime(y, m, d, h, min);
-  }
+}
 
   /// Получает кэшированные изменения
   Future<List<ScheduleChange>?> _getCachedChanges({String? groupCode, String? teacherName}) async {

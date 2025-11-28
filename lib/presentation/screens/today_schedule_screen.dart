@@ -137,6 +137,7 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
       setState(() {
         _weekInfo = extras[0] as WeekInfo;
         _scheduleChanges = extras[1] as List<ScheduleChangeEntity>;
+        print(_scheduleChanges);
       });
     } catch (e) {}
   }
@@ -573,7 +574,8 @@ class _TodayScheduleScreenState extends State<TodayScheduleScreen> {
           id: existing.id,
           number: existing.number,
           subject: subject,
-          groupName: teacher.isNotEmpty ? teacher : existing.groupName,
+          groupName: existing.groupName,
+          teacher: teacher.isNotEmpty ? teacher : '',
           startTime: existing.startTime,
           endTime: existing.endTime,
           building: updatedBuilding.isNotEmpty

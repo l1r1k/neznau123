@@ -237,13 +237,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Проверяем, выбрана ли группа
       final prefs = await SharedPreferences.getInstance();
       final selectedGroupCode = prefs.getString(_selectedGroupKey);
+      final selectedTeacherName = prefs.getString(_teacherNameKey);
+      final role = prefs.getString(_selectedRoleKey);
 
-      if (selectedGroupCode == null || selectedGroupCode.isEmpty) {
+      if ((selectedGroupCode == null || selectedGroupCode.isEmpty) && (selectedTeacherName == null || selectedTeacherName.isEmpty)) {
         if (context.mounted) {
           showInfoNotification(
             context,
-            'Выберите группу',
-            'Сначала выберите специальность и группу',
+            role == 'student' ? 'Выберите группу' : 'Выберите преподавателя',
+            role == 'student' ? 'Сначала выберите специальность и группу' : 'Сначала выберите преподавателя',
             Icons.info_outline,
           );
         }

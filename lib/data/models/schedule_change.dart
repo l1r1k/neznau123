@@ -3,35 +3,22 @@
 /// Этот класс представляет собой изменение в расписании,
 /// например, замену одного предмета на другой
 class ScheduleChange {
-  /// Номер пары, к которой применяется изменение
   final String lessonNumber;
+  final String? group;       // например "П50-5-22"
+  final String replaceFrom; // текст колонки "Что заменяют"
+  final String replaceTo;   // текст колонки "На что заменяют"
+  final String updatedAt;   // дата/время из колонки updated-at
+  final String changeDate;  // заголовок дня (например "Замены на 27.11.2025")
+  final String? role;        // 'from' | 'to' | 'both' — роль искомого преподавателя
 
-  /// Исходный предмет (до изменения)
-  final String replaceFrom;
-
-  /// Новый предмет (после изменения)
-  final String replaceTo;
-
-  /// Время добавления изменения (timestamp)
-  final String updatedAt;
-
-  /// Дата применения изменения
-  final String changeDate;
-
-  /// Конструктор изменения в расписании
-  ///
-  /// Параметры:
-  /// - [lessonNumber]: Номер пары (обязательный)
-  /// - [replaceFrom]: Исходный предмет (обязательный)
-  /// - [replaceTo]: Новый предмет (обязательный)
-  /// - [updatedAt]: Время добавления изменения (обязательный)
-  /// - [changeDate]: Дата применения изменения (обязательный)
   ScheduleChange({
     required this.lessonNumber,
+    this.group,
     required this.replaceFrom,
     required this.replaceTo,
     required this.updatedAt,
     required this.changeDate,
+    this.role,
   });
 
   @override
